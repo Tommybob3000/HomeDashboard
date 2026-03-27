@@ -26,15 +26,15 @@
 
 <script>
     // --- CONFIGURATION: EDIT THIS LINE ---
-    const TARIFF_CODE = 'E-1R-AGILE-FLEX-22-11-25-C'; // Replace with your specific code
-    const PRODUCT_CODE = 'AGILE-FLEX-22-11-25';       // Usually matches the middle part of your tariff
+    const TARIFF_CODE = 'E-1R-AGILE-24-10-01-D'; // Replace with your specific code
+    const PRODUCT_CODE = 'AGILE-24-10-01';       // Usually matches the middle part of your tariff
     // -------------------------------------
 
     const now = new Date();
     const from = now.toISOString();
     const to = new Date(now.getTime() + 24 * 60 * 60 * 1000).toISOString();
     
-    const url = `https://api.octopus.energy/v1/products/AGILE-24-10-01/electricity-tariffs/E-1R-AGILE-24-10-01-D/standard-unit-rates/?period_from=${from}&period_to=${to}`;
+    const url = `https://api.octopus.energy/v1/products/${PRODUCT_CODE}/electricity-tariffs/${TARIFF_CODE}/standard-unit-rates/?period_from=${from}&period_to=${to}`;
 
     fetch(url)
         .then(res => {
