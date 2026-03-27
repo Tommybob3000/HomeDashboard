@@ -4,13 +4,11 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Octopus Agile Live Rates</title>
-    <!-- Load Chart.js from CDN -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
         body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; background: #f4f4f9; padding: 20px; text-align: center; }
         .container { max-width: 800px; margin: 0 auto; background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
         h1 { color: #333; font-size: 1.5rem; margin-bottom: 20px; }
-        /* The canvas needs to be inside a container to be responsive */
         .chart-wrapper { position: relative; height: 400px; width: 100%; }
         .loading { color: #666; margin-top: 50px; font-style: italic; }
         .error { color: #d9534f; font-weight: bold; padding: 20px; background: #ffe6e6; border-radius: 4px; }
@@ -20,17 +18,10 @@
 
 <div class="container">
     <h1>Octopus Agile Rates (Next 24h)</h1>
-    
-    <!-- Loading Message -->
-    <div id="loading-msg" class="loading">Loading live data from Octopus Energy...</div>
-
-    <!-- Chart Wrapper -->
+    <div id="loading-msg" class="loading">Loading live data...</div>
     <div class="chart-wrapper" style="display:none;" id="chart-wrapper">
-        <!-- THIS IS THE MISSING CANVAS TAG -->
         <canvas id="agileChart"></canvas>
     </div>
-
-    <!-- Error Message Container -->
     <div id="error-msg" style="display:none;"></div>
 </div>
 
@@ -46,9 +37,8 @@
         const errorDiv = document.getElementById('error-msg');
         const canvas = document.getElementById('agileChart');
 
-        // Safety check: Ensure canvas exists
         if (!canvas) {
-            errorDiv.innerHTML = "Critical Error: Chart canvas not found in HTML.";
+            errorDiv.innerHTML = "Critical Error: Chart canvas not found.";
             errorDiv.style.display = 'block';
             loadingMsg.style.display = 'none';
             return;
@@ -62,28 +52,29 @@
 
         fetch(url)
             .then(res => {
-                if (!res.ok) {
-                    if (res.status === 404) throw new Error("Tariff Code not found. Check your code in the HTML.");
-                    throw new Error(`API Error: ${res.status}`);
-                }
+                if (!res.ok) throw new Error(`API Error: ${res.status}`);
                 return res.json();
             })
             .then(data => {
-                // Hide loading, show chart container
                 loadingMsg.style.display = 'none';
                 chartWrapper.style.display = 'block';
 
-                const labels = data.results.map(r => {
+                // Map the data
+                let labels = data.results.map(r => {
                     const d = new Date(r.valid_from);
                     return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
                 });
-                const prices = data.results.map(r => r.value_inc_vat);
+                let prices = data.results.map(r => r.value_inc_vat);
 
-                // Dynamic coloring
+                // FIX: Reverse the arrays so time goes forward (Left to Right)
+                labels.reverse();
+                prices.reverse();
+
+                // Recalculate colors based on the reversed prices
                 const colors = prices.map(p => {
-                    if (p < 10) return '#4ade80'; // Green
-                    if (p < 20) return '#fbbf24'; // Orange
-                    return '#f87171';             // Red
+                    if (p < 10) return '#4ade80'; 
+                    if (p < 20) return '#fbbf24'; 
+                    return '#f87171';             
                 });
 
                 const ctx = canvas.getContext('2d');
@@ -112,24 +103,16 @@
                             }
                         },
                         scales: {
-                            y: { 
-                                beginAtZero: true, 
-                                title: { display: true, text: 'Price (pence)' },
-                                grid: { color: '#f0f0f0' }
-                            },
-                            x: { 
-                                ticks: { maxRotation: 45, minRotation: 45 },
-                                grid: { display: false }
-                            }
+                            y: { beginAtZero: true, title: { display: true, text: 'Price (pence)' } },
+                            x: { ticks: { maxRotation: 45, minRotation: 45 } }
                         }
                     }
                 });
             })
             .catch(err => {
                 loadingMsg.style.display = 'none';
-                errorDiv.innerHTML = `<strong>Error loading data:</strong><br>${err.message}<br><br><small>Check your Tariff Code in the HTML source (line 46).</small>`;
+                errorDiv.innerHTML = `<strong>Error:</strong> ${err.message}`;
                 errorDiv.style.display = 'block';
-                console.error(err);
             });
     });
 </script>
