@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Octopus Agile Live Rates</title>
+    <!-- Load Chart.js from CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; background: #f4f4f9; padding: 20px; text-align: center; }
+        .container { max-width: 800px; margin: 0 auto; background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+        h1 { color: #333; font-size: 1.5rem; margin-bottom: 20px; }
+        #chart-container { position: relative; height: 400px; width: 100%; }
+        .loading { color: #666; margin-top: 50px; }
+        .error { color: #d9534f; font-weight: bold; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h1>Octopus Agile Rates (Next 24h)</h1>
+    <div id="chart-container">
+        <p class="loading">Loading live data from Octopus Energy...</p>
+    </div>
+</div>
+
+<script>
+    // --- CONFIGURATION: EDIT THIS LINE ---
+    const TARIFF_CODE = 'E-1R-AGILE-FLEX-22-11-25-C'; // Replace with your specific code
+    const PRODUCT_CODE = 'AGILE-FLEX-22-11-25';       // Usually matches the middle part of your tariff
+    // -------------------------------------
+
+    const now = new Date();
+    const from = now.toISOString();
+    const to = new Date(now.getTime() + 24 * 60 * 60 * 1000).toISOString();
+    
+    const url = `https://api.octopus.energy/v1/products/AGILE-24-10-01/electricity-tariffs/E-1R-AGILE-24-10-01-D/standard-unit-rates/?period_from=${from}&period_to=${to}`;
+
+    fetch(url)
+        .then(res => {
+            if (!res.ok) throw new Error(`API Error: ${res.status}`);
+            return res.json();
+        })
+        .then(data => {
+            document.querySelector('.loading').style.display = 'none';
+            
+            const labels = data.results.map(r => {
+                const d = new Date(r.valid_from);
+                return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+            });
+            const prices = data.results.map(r => r.value_inc_vat);
+
+            // Dynamic coloring: Green (<10p), Orange (10-20p), Red (>20p)
+            const colors = prices.map(p => {
+                if (p < 10) return '#4ade80'; // Green
+                if (p < 20) return '#fbbf24'; // Orange
+                return '#f87171';             // Red
+            });
+
+            const ctx = document.getElementById('chart-container').getContext('2d');
+            new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: 'Price (p/kWh)',
+                        data: prices,
+                        backgroundColor: colors,
+                        borderRadius: 4,
+                        barPercentage: 0.8
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: {
+                            callbacks: {
+                                label: (ctx) => `${ctx.parsed.y.toFixed(2)} p/kWh`
+                            }
+                        }
+                    },
+                    scales: {
+                        y: { beginAtZero: true, title: { display: true, text: 'Price (pence)' } },
+                        x: { ticks: { maxRotation: 45, minRotation: 45 } }
+                    }
+                }
+            });
+        })
+        .catch(err => {
+            document.getElementById('chart-container').innerHTML = `<p class="error">Error loading data: ${err.message}<br>Check your Tariff Code in the HTML source.</p>`;
+            console.error(err);
+        });
+</script>
+
+</body>
+</html>
