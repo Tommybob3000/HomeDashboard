@@ -3,9 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Octopus Agile & Calendar</title>
+    <title>Energy & Schedule Dashboard</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <!-- ICAL.js Parser Library -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/ical.js/1.5.0/ical.min.js"></script>
     <style>
         body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; background: #f4f4f9; padding: 20px; text-align: center; }
@@ -53,12 +52,16 @@
 
 <script>
     document.addEventListener('DOMContentLoaded', function() {
-    // --- CONFIGURATION: EDIT THIS LINE ---
+ // --- CONFIGURATION: EDIT THIS LINE ---
     const TARIFF_CODE = 'E-1R-AGILE-24-10-01-D'; // Replace with your specific code
     const PRODUCT_CODE = 'AGILE-24-10-01';       // Usually matches the middle part of your tariff
         
         // REPLACE WITH YOUR GOOGLE CALENDAR .ics LINK
         const CALENDAR_URL = 'https://calendar.google.com/calendar/ical/8f9b2e07d9ee92bf161283dba01059fe52319cb25d9c7f941b7684d1df7a6b00%40group.calendar.google.com/private-a9281260f59e7a5711027a99de9cc8fa/basic.ics'; 
+
+        
+        // We wrap the URL in a CORS proxy to bypass Google's security block
+        const CALENDAR_URL = `https://api.allorigins.win/raw?url=${encodeURIComponent(RAW_CALENDAR_URL)}`;
         // ---------------------
 
         // 1. LOAD CALENDAR
@@ -75,7 +78,6 @@
         const errorDiv = document.getElementById('calendar-error');
         const list = document.getElementById('event-list');
 
-        // If user didn't change the URL, show a hint
         if (url.includes('YOUR_CALENDAR_ID')) {
             loading.style.display = 'none';
             list.innerHTML = '<p class="no-events">Edit the HTML file to add your Google Calendar .ics link.</p>';
@@ -85,7 +87,7 @@
 
         fetch(url)
             .then(res => {
-                if (!res.ok) throw new Error("Cannot fetch calendar. Ensure link is public.");
+                if (!res.ok) throw new Error("Cannot fetch calendar. Check your link.");
                 return res.text();
             })
             .then(text => {
@@ -95,7 +97,7 @@
                 
                 const now = new Date();
                 const tomorrow = new Date(now);
-                tomorrow.setDate(tomorrow.getDate() + 2); // Look 2 days ahead
+                tomorrow.setDate(tomorrow.getDate() + 2); 
 
                 let events = [];
 
@@ -104,7 +106,6 @@
                     const start = event.startDate.toJSDate();
                     const end = event.endDate.toJSDate();
                     
-                    // Filter: Only show if starts before tomorrow ends
                     if (start < tomorrow) {
                         events.push({
                             summary: event.summary || 'No Title',
@@ -115,7 +116,6 @@
                     }
                 });
 
-                // Sort by time
                 events.sort((a, b) => a.start - b.start);
 
                 loading.style.display = 'none';
@@ -141,8 +141,9 @@
             })
             .catch(err => {
                 loading.style.display = 'none';
-                errorDiv.textContent = err.message;
+                errorDiv.textContent = "Calendar Error: " + err.message + ". Ensure the link is public.";
                 errorDiv.style.display = 'block';
+                console.error(err);
             });
     }
 
@@ -174,7 +175,6 @@
                 });
                 let prices = data.results.map(r => r.value_inc_vat);
 
-                // Reverse to make time go forward (Left to Right)
                 labels.reverse();
                 prices.reverse();
 
