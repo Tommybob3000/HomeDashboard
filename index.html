@@ -4,6 +4,11 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Home Dashboard</title>
+    <!-- Cache Buster: Forces browser to get new code -->
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
+    
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
     
     <script type="module">
@@ -21,39 +26,37 @@
             databaseURL: "https://homedashboard-7dfdd-default-rtdb.europe-west1.firebasedatabase.app"
         };
 
-        let db;
+        let db = null;
         let currentData = {};
+        let isEditMode = false;
 
-        // Initialize
+        // 1. Initialize Firebase
         try {
             const app = initializeApp(firebaseConfig);
             db = getDatabase(app);
             console.log("✅ Firebase Connected");
             
-            // Start Listening
+            // 2. Listen for Data
             const menuRef = ref(db, 'weeklyMenu');
             onValue(menuRef, (snapshot) => {
                 currentData = snapshot.val() || {};
-                renderMenu(); // Re-render whenever data changes
+                renderMenu(); // Auto-update UI when data changes
             }, (error) => {
                 console.error("❌ DB Error:", error);
-                document.getElementById('weekly-menu-container').innerHTML = `<div style="color:red; padding:20px;">⚠️ Error: ${error.code}<br>Check Firebase Rules (must be true/true)</div>`;
+                document.getElementById('weekly-menu-container').innerHTML = `<div style="color:red; padding:20px;">⚠️ Error: ${error.code}<br>Check Firebase Rules</div>`;
             });
         } catch (e) {
             console.error("❌ Init Error:", e);
             document.getElementById('weekly-menu-container').innerHTML = `<div style="color:red; padding:20px;">⚠️ Config Error</div>`;
         }
 
-        // --- GLOBAL FUNCTIONS (Exposed to HTML) ---
-        
-        // 1. Render the Menu
-        window.renderMenu = function() {
+        // 3. Render Function
+        function renderMenu() {
             const container = document.getElementById('weekly-menu-container');
             if (!container) return;
             container.innerHTML = '';
 
             const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
-            const isEdit = window.isEditMode || false;
 
             days.forEach(day => {
                 const key = day.toLowerCase();
@@ -67,12 +70,14 @@
                     itemsHtml = '<div style="color:#ccc; font-size:0.85rem; font-style:italic; padding:5px 0;">No plans yet</div>';
                 } else {
                     items.forEach((item, idx) => {
-                        const delBtn = isEdit ? `<button class="delete-btn" onclick="window.deleteItem('${key}', ${idx})">×</button>` : '';
+                        // Only show delete button if Edit Mode is ON
+                        const delBtn = isEditMode ? `<button class="delete-btn" onclick="window.deleteItem('${key}', ${idx})">×</button>` : '';
                         itemsHtml += `<div class="menu-item-row">${delBtn}<span>${item}</span></div>`;
                     });
                 }
 
-                const addBtn = isEdit ? `<button class="add-mini-btn" onclick="window.addItemPrompt('${key}')">+</button>` : '';
+                // Only show add button if Edit Mode is ON
+                const addBtn = isEditMode ? `<button class="add-mini-btn" onclick="window.addItemPrompt('${key}')">+</button>` : '';
 
                 card.innerHTML = `
                     <div class="day-header">
@@ -83,70 +88,86 @@
                 `;
                 container.appendChild(card);
             });
-        };
+        }
 
-        // 2. Toggle Edit Mode
-        window.toggleEdit = function() {
+        // 4. Edit Toggle Logic (Direct Function)
+        function handleEditClick() {
             if (!db) {
-                alert("Database not connected. Check your Firebase Config keys.");
+                alert("Database not connected. Check console.");
                 return;
             }
 
-            if (!window.isEditMode) {
+            if (!isEditMode) {
+                // Entering Edit Mode
                 const pin = prompt("Enter PIN (1234):");
                 if (pin === "1234") {
-                    window.isEditMode = true;
-                    document.getElementById('edit-btn').classList.add('active');
-                    document.getElementById('edit-btn').textContent = "🔓 Done";
-                    window.renderMenu(); // FORCE RE-RENDER
+                    isEditMode = true;
+                    updateEditButton(true);
+                    renderMenu(); // Refresh to show + buttons
                     console.log("✏️ Edit Mode ON");
                 } else if (pin !== null) {
                     alert("Wrong PIN");
                 }
             } else {
-                window.isEditMode = false;
-                document.getElementById('edit-btn').classList.remove('active');
-                document.getElementById('edit-btn').textContent = "🔒 Edit";
-                window.renderMenu(); // FORCE RE-RENDER
+                // Exiting Edit Mode
+                isEditMode = false;
+                updateEditButton(false);
+                renderMenu(); // Refresh to hide + buttons
                 console.log("🔒 Edit Mode OFF");
             }
-        };
+        }
 
-        // 3. Add Item
+        function updateEditButton(active) {
+            const btn = document.getElementById('edit-btn');
+            if (active) {
+                btn.classList.add('active');
+                btn.textContent = "🔓 Done";
+                btn.style.backgroundColor = "#f87171"; // Force red
+                btn.style.color = "white";
+            } else {
+                btn.classList.remove('active');
+                btn.textContent = "🔒 Edit";
+                btn.style.backgroundColor = ""; // Reset
+                btn.style.color = "";
+            }
+        }
+
+        // 5. Expose Functions to Window (for HTML onclicks)
+        window.toggleEdit = handleEditClick;
+        
         window.addItemPrompt = function(dayKey) {
             const item = prompt(`Add item for ${dayKey}:`);
             if (!item || !item.trim()) return;
-            
             const dayRef = ref(db, `weeklyMenu/${dayKey}`);
-            // Fetch current, add, save
             onValue(dayRef, (snapshot) => {
                 let list = snapshot.val() || [];
                 if (!Array.isArray(list)) list = [];
                 list.push(item.trim());
-                set(dayRef, list)
-                    .then(() => console.log("✅ Added"))
-                    .catch(err => alert("Error: " + err.message));
+                set(dayRef, list).catch(err => alert("Error: " + err.message));
             }, { onlyOnce: true });
         };
 
-        // 4. Delete Item
         window.deleteItem = function(dayKey, index) {
             if (!confirm("Delete this item?")) return;
-            
             const dayRef = ref(db, `weeklyMenu/${dayKey}`);
             onValue(dayRef, (snapshot) => {
                 let list = snapshot.val() || [];
                 if (!Array.isArray(list)) return;
                 list.splice(index, 1);
-                set(dayRef, list)
-                    .then(() => console.log("✅ Deleted"))
-                    .catch(err => alert("Error: " + err.message));
+                set(dayRef, list).catch(err => alert("Error: " + err.message));
             }, { onlyOnce: true });
         };
 
-        window.firebaseReady = true;
-        // Initial render call
-        setTimeout(() => { if(window.renderMenu) window.renderMenu(); }, 500);
+        // 6. Attach Event Listener Directly (More reliable than onclick in HTML)
+        document.addEventListener('DOMContentLoaded', () => {
+            const btn = document.getElementById('edit-btn');
+            if (btn) {
+                btn.addEventListener('click', handleEditClick);
+            }
+            // Initial Render
+            setTimeout(renderMenu, 500);
+        });
+
     </script>
 
     <style>
@@ -154,33 +175,10 @@
         body { font-family: system-ui, -apple-system, sans-serif; background:var(--bg); margin:0; padding:15px; height:100vh; box-sizing:border-box; display:flex; flex-direction:column; gap:15px; overflow:hidden; }
         
         /* TOP: CENTERED CALENDAR */
-        .top-section { 
-            background:var(--card); 
-            padding:15px; 
-            border-radius:12px; 
-            box-shadow:0 2px 5px rgba(0,0,0,0.05); 
-            flex:0 0 auto; 
-            max-height:140px; 
-            overflow:hidden; 
-            text-align: center; /* CENTER TEXT */
-        }
+        .top-section { background:var(--card); padding:15px; border-radius:12px; box-shadow:0 2px 5px rgba(0,0,0,0.05); flex:0 0 auto; max-height:140px; overflow:hidden; text-align: center; }
         .top-section h2 { margin:0 0 10px 0; font-size:1.2rem; color:#555; }
-        .event-scroll { 
-            display:flex; 
-            gap:10px; 
-            overflow-x:auto; 
-            justify-content: center; /* CENTER CARDS */
-            padding-bottom:5px; 
-        }
-        .event-card { 
-            background:#e3f2fd; 
-            border-left:4px solid var(--blue); 
-            padding:8px; 
-            border-radius:6px; 
-            min-width:130px; 
-            font-size:0.85rem; 
-            text-align: left;
-        }
+        .event-scroll { display:flex; gap:10px; overflow-x:auto; justify-content: center; padding-bottom:5px; }
+        .event-card { background:#e3f2fd; border-left:4px solid var(--blue); padding:8px; border-radius:6px; min-width:130px; font-size:0.85rem; text-align: left; }
         .badge { font-size:0.65rem; color:white; padding:2px 6px; border-radius:4px; font-weight:bold; text-transform:uppercase; display:inline-block; margin-bottom:4px; }
         .badge-today { background:var(--green); } .badge-tomorrow { background:var(--orange); }
 
@@ -192,7 +190,7 @@
         /* Menu */
         .menu-header { display:flex; justify-content:space-between; align-items:center; margin-bottom:10px; }
         .menu-header h2 { margin:0; font-size:1.3rem; }
-        .edit-btn { background:none; border:1px solid #ccc; padding:5px 10px; border-radius:6px; cursor:pointer; font-size:0.9rem; }
+        .edit-btn { background:none; border:1px solid #ccc; padding:5px 10px; border-radius:6px; cursor:pointer; font-size:0.9rem; transition: all 0.2s; }
         .edit-btn.active { background:var(--red); color:white; border-color:var(--red); }
         .week-scroll { flex:1; overflow-y:auto; display:flex; flex-direction:column; gap:10px; padding-right:5px; }
         .day-card { background:#f9f9f9; border:1px solid #eee; border-radius:8px; padding:10px; }
@@ -227,7 +225,8 @@
         <div class="menu-panel">
             <div class="menu-header">
                 <h2>🍽️ This Week's Menu</h2>
-                <button id="edit-btn" class="edit-btn" onclick="window.toggleEdit()">🔒 Edit</button>
+                <!-- Removed onclick, using EventListener in JS instead -->
+                <button id="edit-btn" class="edit-btn">🔒 Edit</button>
             </div>
             <div id="weekly-menu-container" class="week-scroll">
                 <div style="text-align:center; color:#999; margin-top:20px;">Connecting...</div>
