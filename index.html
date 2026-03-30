@@ -3,12 +3,15 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Home Dashboard v4.0</title>
+    <title>Home Dashboard</title>
+    
+    <!-- Fonts: Inter for a clean, modern look -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     
     <!-- Chart.js -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
     
-    <!-- Firebase (Compat Mode) -->
+    <!-- Firebase -->
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js"></script>
 
@@ -31,18 +34,15 @@
         try {
             firebase.initializeApp(firebaseConfig);
             db = firebase.database();
-            console.log("✅ Firebase Connected");
             
             db.ref('weeklyMenu').on('value', (snapshot) => {
                 currentData = snapshot.val() || {};
                 renderMenu();
             }, (error) => {
-                console.error("❌ DB Error:", error);
-                document.getElementById('weekly-menu-container').innerHTML = `<div style="color:red; padding:20px;">⚠️ Error: ${error.code}<br>Check Rules</div>`;
+                document.getElementById('weekly-menu-container').innerHTML = `<div style="color:#ef4444; background:#fee2e2; padding:15px; border-radius:8px;">⚠️ Data Error: ${error.code}</div>`;
             });
         } catch (e) {
-            console.error("❌ Init Error:", e);
-            alert("Firebase Init Failed: " + e.message);
+            alert("Config Error: " + e.message);
         }
 
         function renderMenu() {
@@ -51,62 +51,64 @@
             container.innerHTML = '';
             
             const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
-            const todayIndex = new Date().getDay() - 1; // getDay(): 0=Sun, 1=Mon... so -1 makes Mon=0
-            const currentDayName = todayIndex === -1 ? 'Sunday' : days[todayIndex]; // Handle Sunday case
+            const todayIndex = new Date().getDay() - 1;
+            const currentDayName = todayIndex === -1 ? 'Sunday' : days[todayIndex];
 
-            days.forEach((day, index) => {
+            days.forEach((day) => {
                 const key = day.toLowerCase();
                 const items = Array.isArray(currentData[key]) ? currentData[key] : [];
+                const isToday = (day === currentDayName);
+                
                 const card = document.createElement('div');
-                card.className = 'day-card';
-
-                // ✅ HIGHLIGHT TODAY'S CARD
-                if (day === currentDayName) {
-                    card.style.backgroundColor = '#ecfdf5'; // Pale Green
-                    card.style.border = '2px solid #4ade80'; // Green Border
-                    card.style.position = 'relative';
-                }
+                card.className = `day-card ${isToday ? 'day-card-today' : ''}`;
 
                 let itemsHtml = '';
                 if (items.length === 0) {
-                    itemsHtml = '<div style="color:#ccc; font-size:0.85rem; font-style:italic; padding:5px 0;">No plans yet</div>';
+                    itemsHtml = `<div class="empty-state">No plans yet</div>`;
                 } else {
                     items.forEach((item, idx) => {
                         const delBtn = isEditMode ? `<button class="delete-btn" onclick="deleteItem('${key}', ${idx})">×</button>` : '';
-                        itemsHtml += `<div class="menu-item-row">${delBtn}<span>${item}</span></div>`;
+                        itemsHtml += `<div class="menu-item">${delBtn}<span class="item-text">${item}</span></div>`;
                     });
                 }
 
-                const addBtn = isEditMode ? `<button class="add-mini-btn" onclick="addItemPrompt('${key}')">+</button>` : '';
+                const addBtn = isEditMode ? `<button class="add-btn" onclick="addItemPrompt('${key}')">+</button>` : '';
+                const todayBadge = isToday ? `<span class="today-badge">● Today</span>` : '';
 
-                // Add a small "Today" label if it's the current day
-                const dayLabel = (day === currentDayName) ? `<span style="font-size:0.7rem; color:#4ade80; font-weight:bold; text-transform:uppercase; margin-left:5px;">● Today</span>` : '';
-
-                card.innerHTML = `<div class="day-header"><h3>${day}${dayLabel}</h3>${addBtn}</div><div class="day-items">${itemsHtml}</div>`;
+                card.innerHTML = `
+                    <div class="day-header">
+                        <div class="day-title-group">
+                            <h3>${day}</h3>
+                            ${todayBadge}
+                        </div>
+                        ${addBtn}
+                    </div>
+                    <div class="day-items">${itemsHtml}</div>
+                `;
                 container.appendChild(card);
             });
         }
 
         function toggleEdit() {
-            if (!db) { alert("Database not connected"); return; }
+            if (!db) { alert("Database disconnected"); return; }
             if (!isEditMode) {
                 const pin = prompt("Enter PIN");
                 if (pin === "1234") {
                     isEditMode = true;
                     document.getElementById('edit-btn').classList.add('active');
-                    document.getElementById('edit-btn').textContent = "🔓 Done";
+                    document.getElementById('edit-btn').textContent = "Done";
                     renderMenu();
-                } else if (pin !== null) { alert("Wrong PIN"); }
+                } else if (pin !== null) { alert("Incorrect PIN"); }
             } else {
                 isEditMode = false;
                 document.getElementById('edit-btn').classList.remove('active');
-                document.getElementById('edit-btn').textContent = "🔒 Edit";
+                document.getElementById('edit-btn').textContent = "Edit";
                 renderMenu();
             }
         }
 
         window.addItemPrompt = function(key) {
-            const item = prompt(`Add for ${key}:`);
+            const item = prompt(`Add item for ${key}:`);
             if (!item) return;
             db.ref('weeklyMenu/' + key).once('value', s => {
                 let list = s.val() || [];
@@ -117,7 +119,7 @@
         };
 
         window.deleteItem = function(key, idx) {
-            if (!confirm("Delete?")) return;
+            if (!confirm("Remove this item?")) return;
             db.ref('weeklyMenu/' + key).once('value', s => {
                 let list = s.val() || [];
                 if (!Array.isArray(list)) return;
@@ -128,70 +130,318 @@
 
         window.addEventListener('DOMContentLoaded', () => {
             document.getElementById('edit-btn').addEventListener('click', toggleEdit);
-            setTimeout(renderMenu, 1000);
+            setTimeout(renderMenu, 500);
         });
     </script>
 
     <style>
-        :root { --bg:#f4f4f9; --card:#fff; --blue:#2196f3; --red:#f87171; --dark-red:#b91c1c; --green:#4ade80; --orange:#fbbf24; }
-        body { font-family: system-ui, sans-serif; background:var(--bg); margin:0; padding:15px; height:100vh; box-sizing:border-box; display:flex; flex-direction:column; gap:15px; overflow:hidden; }
-        .top-section { background:var(--card); padding:15px; border-radius:12px; box-shadow:0 2px 5px rgba(0,0,0,0.05); flex:0 0 auto; max-height:140px; overflow:hidden; text-align: center; }
-        .top-section h2 { margin:0 0 10px 0; font-size:1.2rem; color:#555; }
-        .event-scroll { display:flex; gap:10px; overflow-x:auto; justify-content: center; padding-bottom:5px; }
-        .event-card { background:#e3f2fd; border-left:4px solid var(--blue); padding:8px; border-radius:6px; min-width:130px; font-size:0.85rem; text-align: left; }
-        .badge { font-size:0.65rem; color:white; padding:2px 6px; border-radius:4px; font-weight:bold; text-transform:uppercase; display:inline-block; margin-bottom:4px; }
-        .badge-today { background:var(--green); } .badge-tomorrow { background:var(--orange); }
-        .main-split { display:flex; gap:15px; flex:1; overflow:hidden; }
-        .menu-panel { flex:1; max-width:400px; background:var(--card); padding:15px; border-radius:12px; box-shadow:0 2px 5px rgba(0,0,0,0.05); display:flex; flex-direction:column; }
-        .energy-panel { flex:2; background:var(--card); padding:15px; border-radius:12px; box-shadow:0 2px 5px rgba(0,0,0,0.05); display:flex; flex-direction:column; }
-        .menu-header { display:flex; justify-content:space-between; align-items:center; margin-bottom:10px; }
-        .menu-header h2 { margin:0; font-size:1.3rem; }
-        .edit-btn { background:none; border:1px solid #ccc; padding:5px 10px; border-radius:6px; cursor:pointer; font-size:0.9rem; transition: all 0.2s; }
-        .edit-btn.active { background:var(--red); color:white; border-color:var(--red); }
-        .week-scroll { flex:1; overflow-y:auto; display:flex; flex-direction:column; gap:10px; padding-right:5px; }
+        :root {
+            --bg: #f3f4f6;
+            --card-bg: #ffffff;
+            --text-main: #1f2937;
+            --text-muted: #6b7280;
+            --primary: #3b82f6;
+            --success: #10b981;
+            --warning: #f59e0b;
+            --danger: #ef4444;
+            --danger-dark: #b91c1c;
+            --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+            --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+            --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+            --radius: 16px;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background: var(--bg);
+            color: var(--text-main);
+            margin: 0;
+            padding: 20px;
+            height: 100vh;
+            box-sizing: border-box;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+            overflow: hidden;
+        }
+
+        /* --- Top Calendar --- */
+        .top-section {
+            background: var(--card-bg);
+            padding: 20px 25px;
+            border-radius: var(--radius);
+            box-shadow: var(--shadow-md);
+            flex: 0 0 auto;
+            max-height: 150px;
+            overflow: hidden;
+            text-align: center;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+        }
+        .top-section h2 {
+            margin: 0 0 12px 0;
+            font-size: 1.1rem;
+            font-weight: 600;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+        .event-scroll {
+            display: flex;
+            gap: 12px;
+            overflow-x: auto;
+            justify-content: center;
+            padding-bottom: 5px;
+            scrollbar-width: none; /* Firefox */
+        }
+        .event-scroll::-webkit-scrollbar { display: none; }
         
-        .day-card { background:#f9f9f9; border:1px solid #eee; border-radius:8px; padding:10px; transition: all 0.3s ease; }
+        .event-card {
+            background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%);
+            border-left: 4px solid var(--primary);
+            padding: 10px 14px;
+            border-radius: 12px;
+            min-width: 140px;
+            font-size: 0.9rem;
+            text-align: left;
+            box-shadow: var(--shadow-sm);
+            transition: transform 0.2s;
+        }
+        .event-card:hover { transform: translateY(-2px); }
         
-        .day-header { display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid #eee; padding-bottom:5px; margin-bottom:8px; }
-        .day-header h3 { margin:0; font-size:1rem; color:#555; }
-        .add-mini-btn { background:var(--blue); color:white; border:none; width:24px; height:24px; border-radius:50%; cursor:pointer; font-size:1.2rem; line-height:1; display:flex; align-items:center; justify-content:center; padding:0; }
-        .day-items { display:flex; flex-direction:column; gap:4px; }
-        .menu-item-row { display:flex; align-items:center; gap:8px; font-size:0.9rem; }
-        .delete-btn { background:var(--red); color:white; border:none; width:18px; height:18px; border-radius:50%; cursor:pointer; font-size:0.8rem; display:flex; align-items:center; justify-content:center; padding:0; }
-        .chart-box { flex:1; position:relative; min-height:0; }
-        .slots-info { margin-top:15px; padding:10px; background:#f0f7ff; border-radius:8px; display:flex; justify-content:space-around; flex-wrap:wrap; gap:10px; }
-        .slot-item { text-align:center; }
-        .slot-label { font-size:0.7rem; color:#666; font-weight:bold; text-transform:uppercase; }
-        .slot-time { font-weight:bold; color:var(--blue); }
-        @media(max-width:900px) { .main-split { flex-direction:column; } .menu-panel { max-width:100%; height:300px; } }
+        .badge {
+            font-size: 0.65rem;
+            font-weight: 700;
+            color: white;
+            padding: 3px 8px;
+            border-radius: 20px;
+            text-transform: uppercase;
+            display: inline-block;
+            margin-bottom: 6px;
+            letter-spacing: 0.05em;
+        }
+        .badge-today { background: var(--success); }
+        .badge-tomorrow { background: var(--warning); }
+        .event-time { font-weight: 600; color: var(--text-main); font-size: 0.95rem; }
+        .event-summary { color: var(--text-muted); font-size: 0.85rem; margin-top: 2px; }
+
+        /* --- Main Split --- */
+        .main-split {
+            display: flex;
+            gap: 20px;
+            flex: 1;
+            overflow: hidden;
+        }
+
+        /* --- Left: Menu --- */
+        .menu-panel {
+            flex: 1;
+            max-width: 400px;
+            background: var(--card-bg);
+            padding: 20px;
+            border-radius: var(--radius);
+            box-shadow: var(--shadow-md);
+            display: flex;
+            flex-direction: column;
+        }
+        .menu-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+            padding-bottom: 15px;
+            border-bottom: 1px solid #f3f4f6;
+        }
+        .menu-header h2 { margin: 0; font-size: 1.25rem; font-weight: 700; color: var(--text-main); }
+        
+        .edit-btn {
+            background: white;
+            border: 1px solid #e5e7eb;
+            color: var(--text-muted);
+            padding: 6px 14px;
+            border-radius: 20px;
+            cursor: pointer;
+            font-size: 0.85rem;
+            font-weight: 500;
+            transition: all 0.2s;
+        }
+        .edit-btn:hover { background: #f9fafb; border-color: #d1d5db; }
+        .edit-btn.active {
+            background: var(--danger);
+            color: white;
+            border-color: var(--danger);
+            box-shadow: 0 2px 4px rgba(239, 68, 68, 0.3);
+        }
+
+        .week-scroll {
+            flex: 1;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            padding-right: 5px;
+        }
+        /* Custom Scrollbar */
+        .week-scroll::-webkit-scrollbar { width: 6px; }
+        .week-scroll::-webkit-scrollbar-thumb { background: #e5e7eb; border-radius: 3px; }
+
+        .day-card {
+            background: #f9fafb;
+            border: 1px solid #f3f4f6;
+            border-radius: 12px;
+            padding: 14px;
+            transition: all 0.3s ease;
+        }
+        .day-card-today {
+            background: #ecfdf5;
+            border: 1px solid #a7f3d0;
+            box-shadow: 0 4px 6px -1px rgba(16, 185, 129, 0.1);
+        }
+
+        .day-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+        .day-title-group { display: flex; align-items: center; gap: 8px; }
+        .day-title-group h3 { margin: 0; font-size: 0.95rem; font-weight: 600; color: var(--text-main); }
+        .today-badge {
+            font-size: 0.65rem;
+            color: var(--success);
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        .add-btn {
+            background: var(--primary);
+            color: white;
+            border: none;
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            cursor: pointer;
+            font-size: 1.2rem;
+            line-height: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: transform 0.2s;
+            box-shadow: 0 2px 4px rgba(59, 130, 246, 0.3);
+        }
+        .add-btn:hover { transform: scale(1.1); }
+
+        .day-items { display: flex; flex-direction: column; gap: 6px; }
+        .empty-state { color: #9ca3af; font-size: 0.85rem; font-style: italic; text-align: center; padding: 4px 0; }
+        
+        .menu-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 0.9rem;
+            color: var(--text-main);
+            background: white;
+            padding: 6px 10px;
+            border-radius: 8px;
+            border: 1px solid #f3f4f6;
+        }
+        .item-text { flex: 1; word-break: break-word; }
+        
+        .delete-btn {
+            background: #fee2e2;
+            color: var(--danger);
+            border: none;
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            cursor: pointer;
+            font-size: 0.8rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s;
+        }
+        .delete-btn:hover { background: var(--danger); color: white; }
+
+        /* --- Right: Energy --- */
+        .energy-panel {
+            flex: 2;
+            background: var(--card-bg);
+            padding: 20px;
+            border-radius: var(--radius);
+            box-shadow: var(--shadow-md);
+            display: flex;
+            flex-direction: column;
+        }
+        .energy-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+        }
+        .energy-header h2 { margin: 0; font-size: 1.25rem; font-weight: 700; color: var(--text-main); }
+        
+        .chart-box { flex: 1; position: relative; min-height: 0; }
+        
+        .slots-info {
+            margin-top: 20px;
+            padding: 15px;
+            background: #eff6ff;
+            border-radius: 12px;
+            border: 1px solid #dbeafe;
+            display: flex;
+            justify-content: space-around;
+            flex-wrap: wrap;
+            gap: 15px;
+        }
+        .slot-item { text-align: center; }
+        .slot-label { font-size: 0.7rem; color: #6b7280; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 4px; }
+        .slot-time { font-weight: 700; color: var(--primary); font-size: 1.05rem; }
+        .slot-price { font-size: 0.85rem; color: #9ca3af; font-weight: 500; }
+
+        @media(max-width: 900px) {
+            .main-split { flex-direction: column; }
+            .menu-panel { max-width: 100%; height: 350px; }
+            .energy-panel { height: 400px; }
+        }
     </style>
 </head>
 <body>
+
+    <!-- TOP: CALENDAR -->
     <div class="top-section">
         <h2>📅 Today & Tomorrow</h2>
-        <div id="calendar-loading" style="color:#666; font-size:0.9rem;">Loading...</div>
+        <div id="calendar-loading" style="color:#9ca3af; font-size:0.9rem;">Loading events...</div>
         <div id="event-list" class="event-scroll" style="display:none;"></div>
     </div>
+
     <div class="main-split">
+        <!-- LEFT: MENU -->
         <div class="menu-panel">
             <div class="menu-header">
-                <h2>🍽️ This Week's Menu</h2>
-                <button id="edit-btn" class="edit-btn">🔒 Edit</button>
+                <h2>🍽️ Weekly Menu</h2>
+                <button id="edit-btn" class="edit-btn">✏️ Edit</button>
             </div>
             <div id="weekly-menu-container" class="week-scroll">
-                <div style="text-align:center; color:#999; margin-top:20px;">Connecting...</div>
+                <div style="text-align:center; color:#9ca3af; margin-top:30px;">Loading menu...</div>
             </div>
         </div>
+
+        <!-- RIGHT: ENERGY -->
         <div class="energy-panel">
-            <h2>⚡ Energy Rates</h2>
-            <div id="chart-loading" style="color:#666; font-size:0.9rem;">Loading...</div>
+            <div class="energy-header">
+                <h2>⚡ Agile Rates</h2>
+            </div>
+            <div id="chart-loading" style="color:#9ca3af; font-size:0.9rem; margin-bottom:10px;">Updating rates...</div>
             <div class="chart-box"><canvas id="agileChart"></canvas></div>
             <div id="slots-container" class="slots-info" style="display:none;"></div>
         </div>
     </div>
 
     <script>
-        // Calendar
+        // --- CALENDAR ---
         const CAL_URL = 'https://calendar.google.com/calendar/ical/8f9b2e07d9ee92bf161283dba01059fe52319cb25d9c7f941b7684d1df7a6b00%40group.calendar.google.com/private-a9281260f59e7a5711027a99de9cc8fa/basic.ics';
         fetch(`https://corsproxy.io/?${encodeURIComponent(CAL_URL)}`)
         .then(r=>r.text()).then(text=>{
@@ -206,23 +456,33 @@
             const now=new Date(); const startT=new Date(now.getFullYear(),now.getMonth(),now.getDate());
             const endT=new Date(startT); endT.setDate(endT.getDate()+2);
             const f=events.filter(e=>e.st && e.st<endT && e.st>=startT).sort((a,b)=>a.st-b.st);
+            
             document.getElementById('calendar-loading').style.display='none';
             const list=document.getElementById('event-list'); list.style.display='flex';
-            if(f.length===0) list.innerHTML='<span style="color:#999">No events</span>';
-            else f.forEach(e=>{
-                const isToday = e.st.toDateString()===now.toDateString();
-                list.innerHTML+=`<div class="event-card"><span class="badge ${isToday?'badge-today':'badge-tomorrow'}">${isToday?'Today':'Tomorrow'}</span><div style="font-weight:bold">${e.st.toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'})}</div><div>${e.s}</div></div>`;
-            });
-        }).catch(()=>{ document.getElementById('calendar-loading').innerText='Error'; });
+            
+            if(f.length===0) {
+                list.innerHTML='<span style="color:#9ca3af; font-style:italic;">No upcoming events</span>';
+            } else {
+                f.forEach(e=>{
+                    const isToday = e.st.toDateString()===now.toDateString();
+                    const timeStr = e.st.getHours()===0 && e.st.getMinutes()===0 ? 'All Day' : e.st.toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});
+                    list.innerHTML+=`
+                        <div class="event-card">
+                            <span class="badge ${isToday?'badge-today':'badge-tomorrow'}">${isToday?'Today':'Tomorrow'}</span>
+                            <div class="event-time">${timeStr}</div>
+                            <div class="event-summary">${e.s}</div>
+                        </div>`;
+                });
+            }
+        }).catch(()=>{ document.getElementById('calendar-loading').innerText='Error loading calendar'; });
 
-        // Energy Chart
+        // --- ENERGY CHART ---
         let agileChart = null;
 
         function loadEnergyData() {
             const loading = document.getElementById('chart-loading');
             loading.style.display = 'block';
-            loading.innerText = 'Updating...';
-
+            
             fetch(`https://api.octopus.energy/v1/products/AGILE-24-10-01/electricity-tariffs/E-1R-AGILE-24-10-01-D/standard-unit-rates/?period_from=${new Date().toISOString()}&period_to=${new Date(Date.now()+86400000).toISOString()}`)
             .then(r=>r.json()).then(d=>{
                 loading.style.display = 'none';
@@ -232,16 +492,14 @@
                 lb.reverse(); pr.reverse();
                 
                 const colors = pr.map(p => {
-                    if (p < 0) return '#2196f3';
-                    if (p < 20) return '#4ade80';
-                    if (p < 30) return '#fbbf24';
-                    if (p < 40) return '#f87171';
-                    return '#b91c1c';
+                    if (p < 0) return '#3b82f6';      // Blue
+                    if (p < 20) return '#10b981';     // Green
+                    if (p < 30) return '#f59e0b';     // Orange
+                    if (p < 40) return '#ef4444';     // Red
+                    return '#b91c1c';                 // Dark Red
                 });
 
-                if (agileChart) {
-                    agileChart.destroy();
-                }
+                if (agileChart) agileChart.destroy();
 
                 agileChart = new Chart(ctx,{
                     type:'bar',
@@ -250,7 +508,9 @@
                         datasets:[{
                             data:pr,
                             backgroundColor: colors,
-                            borderRadius:4
+                            borderRadius: 6,
+                            barPercentage: 0.8,
+                            categoryPercentage: 0.9
                         }]
                     },
                     options:{
@@ -260,7 +520,12 @@
                         scales:{
                             y: { 
                                 beginAtZero: true,
-                                title: { display: true, text: 'Price (p/kWh)' } 
+                                grid: { color: '#f3f4f6', drawBorder: false },
+                                ticks: { color: '#9ca3af', font: { family: 'Inter', size: 10 } }
+                            },
+                            x: { 
+                                grid: { display: false },
+                                ticks: { color: '#9ca3af', font: { family: 'Inter', size: 10 }, maxRotation: 45, minRotation: 45 }
                             }
                         }
                     }
@@ -268,19 +533,16 @@
                 
                 updateSlots(pr, lb);
             })
-            .catch(()=>{ 
-                loading.innerText = 'Error updating'; 
-                setTimeout(loadEnergyData, 60000);
-            });
+            .catch(()=>{ loading.innerText = 'Update failed'; setTimeout(loadEnergyData, 60000); });
         }
 
         function updateSlots(pr, lb) {
             const find=(n)=>{ let min=Infinity, idx=-1; for(let i=0;i<=pr.length-n;i++){let s=0;for(let j=0;j<n;j++)s+=pr[i+j]; if(s<min){min=s;idx=i;}} return idx>-1?{st:lb[idx],en:lb[idx+n],av:(min/n).toFixed(1)}:null; };
             const s1=find(2), s2=find(4), s3=find(6);
             const sc=document.getElementById('slots-container'); sc.style.display='flex';
-            sc.innerHTML = (s1?`<div class="slot-item"><div class="slot-label">1 Hr</div><div class="slot-time">${s1.st}-${s1.en}</div><div class="slot-label">${s1.av}p</div></div>`:'') + 
-                           (s2?`<div class="slot-item"><div class="slot-label">2 Hrs</div><div class="slot-time">${s2.st}-${s2.en}</div><div class="slot-label">${s2.av}p</div></div>`:'') + 
-                           (s3?`<div class="slot-item"><div class="slot-label">3 Hrs</div><div class="slot-time">${s3.st}-${s3.en}</div><div class="slot-label">${s3.av}p</div></div>`:'');
+            sc.innerHTML = (s1?`<div class="slot-item"><div class="slot-label">Best 1 Hr</div><div class="slot-time">${s1.st} - ${s1.en}</div><div class="slot-price">${s1.av}p</div></div>`:'') + 
+                           (s2?`<div class="slot-item"><div class="slot-label">Best 2 Hrs</div><div class="slot-time">${s2.st} - ${s2.en}</div><div class="slot-price">${s2.av}p</div></div>`:'') + 
+                           (s3?`<div class="slot-item"><div class="slot-label">Best 3 Hrs</div><div class="slot-time">${s3.st} - ${s3.en}</div><div class="slot-price">${s3.av}p</div></div>`:'');
         }
 
         loadEnergyData();
