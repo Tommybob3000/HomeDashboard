@@ -3,18 +3,16 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Home Dashboard</title>
-    <!-- Cache Buster: Forces browser to get new code -->
-    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
-    <meta http-equiv="Pragma" content="no-cache">
-    <meta http-equiv="Expires" content="0">
+    <title>Home Dashboard v4.0</title>
     
+    <!-- Chart.js -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
     
-    <script type="module">
-        import { initializeApp } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-app.js";
-        import { getDatabase, ref, onValue, set } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-database.js";
+    <!-- Firebase (Compat Mode) -->
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js"></script>
 
+    <script>
         // 🔥 CONFIGURATION
         const firebaseConfig = {
             apiKey: "AIzaSyClW1ZAVPlriZueY2EnnXrxHDtnRC8ncqQ",
@@ -26,42 +24,36 @@
             databaseURL: "https://homedashboard-7dfdd-default-rtdb.europe-west1.firebasedatabase.app"
         };
 
-        let db = null;
+        let db;
         let currentData = {};
         let isEditMode = false;
 
-        // 1. Initialize Firebase
         try {
-            const app = initializeApp(firebaseConfig);
-            db = getDatabase(app);
+            firebase.initializeApp(firebaseConfig);
+            db = firebase.database();
             console.log("✅ Firebase Connected");
             
-            // 2. Listen for Data
-            const menuRef = ref(db, 'weeklyMenu');
-            onValue(menuRef, (snapshot) => {
+            db.ref('weeklyMenu').on('value', (snapshot) => {
                 currentData = snapshot.val() || {};
-                renderMenu(); // Auto-update UI when data changes
+                renderMenu();
             }, (error) => {
                 console.error("❌ DB Error:", error);
-                document.getElementById('weekly-menu-container').innerHTML = `<div style="color:red; padding:20px;">⚠️ Error: ${error.code}<br>Check Firebase Rules</div>`;
+                document.getElementById('weekly-menu-container').innerHTML = `<div style="color:red; padding:20px;">⚠️ Error: ${error.code}<br>Check Rules</div>`;
             });
         } catch (e) {
             console.error("❌ Init Error:", e);
-            document.getElementById('weekly-menu-container').innerHTML = `<div style="color:red; padding:20px;">⚠️ Config Error</div>`;
+            alert("Firebase Init Failed: " + e.message);
         }
 
-        // 3. Render Function
         function renderMenu() {
             const container = document.getElementById('weekly-menu-container');
             if (!container) return;
             container.innerHTML = '';
-
             const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
 
             days.forEach(day => {
                 const key = day.toLowerCase();
                 const items = Array.isArray(currentData[key]) ? currentData[key] : [];
-                
                 const card = document.createElement('div');
                 card.className = 'day-card';
 
@@ -70,124 +62,75 @@
                     itemsHtml = '<div style="color:#ccc; font-size:0.85rem; font-style:italic; padding:5px 0;">No plans yet</div>';
                 } else {
                     items.forEach((item, idx) => {
-                        // Only show delete button if Edit Mode is ON
-                        const delBtn = isEditMode ? `<button class="delete-btn" onclick="window.deleteItem('${key}', ${idx})">×</button>` : '';
+                        const delBtn = isEditMode ? `<button class="delete-btn" onclick="deleteItem('${key}', ${idx})">×</button>` : '';
                         itemsHtml += `<div class="menu-item-row">${delBtn}<span>${item}</span></div>`;
                     });
                 }
 
-                // Only show add button if Edit Mode is ON
-                const addBtn = isEditMode ? `<button class="add-mini-btn" onclick="window.addItemPrompt('${key}')">+</button>` : '';
+                const addBtn = isEditMode ? `<button class="add-mini-btn" onclick="addItemPrompt('${key}')">+</button>` : '';
 
-                card.innerHTML = `
-                    <div class="day-header">
-                        <h3>${day}</h3>
-                        ${addBtn}
-                    </div>
-                    <div class="day-items">${itemsHtml}</div>
-                `;
+                card.innerHTML = `<div class="day-header"><h3>${day}</h3>${addBtn}</div><div class="day-items">${itemsHtml}</div>`;
                 container.appendChild(card);
             });
         }
 
-        // 4. Edit Toggle Logic (Direct Function)
-        function handleEditClick() {
-            if (!db) {
-                alert("Database not connected. Check console.");
-                return;
-            }
-
+        function toggleEdit() {
+            if (!db) { alert("Database not connected"); return; }
             if (!isEditMode) {
-                // Entering Edit Mode
                 const pin = prompt("Enter PIN (1234):");
                 if (pin === "1234") {
                     isEditMode = true;
-                    updateEditButton(true);
-                    renderMenu(); // Refresh to show + buttons
-                    console.log("✏️ Edit Mode ON");
-                } else if (pin !== null) {
-                    alert("Wrong PIN");
-                }
+                    document.getElementById('edit-btn').classList.add('active');
+                    document.getElementById('edit-btn').textContent = "🔓 Done";
+                    renderMenu();
+                } else if (pin !== null) { alert("Wrong PIN"); }
             } else {
-                // Exiting Edit Mode
                 isEditMode = false;
-                updateEditButton(false);
-                renderMenu(); // Refresh to hide + buttons
-                console.log("🔒 Edit Mode OFF");
+                document.getElementById('edit-btn').classList.remove('active');
+                document.getElementById('edit-btn').textContent = "🔒 Edit";
+                renderMenu();
             }
         }
 
-        function updateEditButton(active) {
-            const btn = document.getElementById('edit-btn');
-            if (active) {
-                btn.classList.add('active');
-                btn.textContent = "🔓 Done";
-                btn.style.backgroundColor = "#f87171"; // Force red
-                btn.style.color = "white";
-            } else {
-                btn.classList.remove('active');
-                btn.textContent = "🔒 Edit";
-                btn.style.backgroundColor = ""; // Reset
-                btn.style.color = "";
-            }
-        }
-
-        // 5. Expose Functions to Window (for HTML onclicks)
-        window.toggleEdit = handleEditClick;
-        
-        window.addItemPrompt = function(dayKey) {
-            const item = prompt(`Add item for ${dayKey}:`);
-            if (!item || !item.trim()) return;
-            const dayRef = ref(db, `weeklyMenu/${dayKey}`);
-            onValue(dayRef, (snapshot) => {
-                let list = snapshot.val() || [];
+        window.addItemPrompt = function(key) {
+            const item = prompt(`Add for ${key}:`);
+            if (!item) return;
+            db.ref('weeklyMenu/' + key).once('value', s => {
+                let list = s.val() || [];
                 if (!Array.isArray(list)) list = [];
-                list.push(item.trim());
-                set(dayRef, list).catch(err => alert("Error: " + err.message));
-            }, { onlyOnce: true });
+                list.push(item);
+                db.ref('weeklyMenu/' + key).set(list);
+            });
         };
 
-        window.deleteItem = function(dayKey, index) {
-            if (!confirm("Delete this item?")) return;
-            const dayRef = ref(db, `weeklyMenu/${dayKey}`);
-            onValue(dayRef, (snapshot) => {
-                let list = snapshot.val() || [];
+        window.deleteItem = function(key, idx) {
+            if (!confirm("Delete?")) return;
+            db.ref('weeklyMenu/' + key).once('value', s => {
+                let list = s.val() || [];
                 if (!Array.isArray(list)) return;
-                list.splice(index, 1);
-                set(dayRef, list).catch(err => alert("Error: " + err.message));
-            }, { onlyOnce: true });
+                list.splice(idx, 1);
+                db.ref('weeklyMenu/' + key).set(list);
+            });
         };
 
-        // 6. Attach Event Listener Directly (More reliable than onclick in HTML)
-        document.addEventListener('DOMContentLoaded', () => {
-            const btn = document.getElementById('edit-btn');
-            if (btn) {
-                btn.addEventListener('click', handleEditClick);
-            }
-            // Initial Render
-            setTimeout(renderMenu, 500);
+        window.addEventListener('DOMContentLoaded', () => {
+            document.getElementById('edit-btn').addEventListener('click', toggleEdit);
+            setTimeout(renderMenu, 1000);
         });
-
     </script>
 
     <style>
-        :root { --bg:#f4f4f9; --card:#fff; --blue:#2196f3; --red:#f87171; --green:#4ade80; --orange:#fbbf24; }
-        body { font-family: system-ui, -apple-system, sans-serif; background:var(--bg); margin:0; padding:15px; height:100vh; box-sizing:border-box; display:flex; flex-direction:column; gap:15px; overflow:hidden; }
-        
-        /* TOP: CENTERED CALENDAR */
+        :root { --bg:#f4f4f9; --card:#fff; --blue:#2196f3; --red:#f87171; --dark-red:#b91c1c; --green:#4ade80; --orange:#fbbf24; }
+        body { font-family: system-ui, sans-serif; background:var(--bg); margin:0; padding:15px; height:100vh; box-sizing:border-box; display:flex; flex-direction:column; gap:15px; overflow:hidden; }
         .top-section { background:var(--card); padding:15px; border-radius:12px; box-shadow:0 2px 5px rgba(0,0,0,0.05); flex:0 0 auto; max-height:140px; overflow:hidden; text-align: center; }
         .top-section h2 { margin:0 0 10px 0; font-size:1.2rem; color:#555; }
         .event-scroll { display:flex; gap:10px; overflow-x:auto; justify-content: center; padding-bottom:5px; }
         .event-card { background:#e3f2fd; border-left:4px solid var(--blue); padding:8px; border-radius:6px; min-width:130px; font-size:0.85rem; text-align: left; }
         .badge { font-size:0.65rem; color:white; padding:2px 6px; border-radius:4px; font-weight:bold; text-transform:uppercase; display:inline-block; margin-bottom:4px; }
         .badge-today { background:var(--green); } .badge-tomorrow { background:var(--orange); }
-
-        /* MAIN SPLIT */
         .main-split { display:flex; gap:15px; flex:1; overflow:hidden; }
         .menu-panel { flex:1; max-width:400px; background:var(--card); padding:15px; border-radius:12px; box-shadow:0 2px 5px rgba(0,0,0,0.05); display:flex; flex-direction:column; }
         .energy-panel { flex:2; background:var(--card); padding:15px; border-radius:12px; box-shadow:0 2px 5px rgba(0,0,0,0.05); display:flex; flex-direction:column; }
-        
-        /* Menu */
         .menu-header { display:flex; justify-content:space-between; align-items:center; margin-bottom:10px; }
         .menu-header h2 { margin:0; font-size:1.3rem; }
         .edit-btn { background:none; border:1px solid #ccc; padding:5px 10px; border-radius:6px; cursor:pointer; font-size:0.9rem; transition: all 0.2s; }
@@ -200,40 +143,30 @@
         .day-items { display:flex; flex-direction:column; gap:4px; }
         .menu-item-row { display:flex; align-items:center; gap:8px; font-size:0.9rem; }
         .delete-btn { background:var(--red); color:white; border:none; width:18px; height:18px; border-radius:50%; cursor:pointer; font-size:0.8rem; display:flex; align-items:center; justify-content:center; padding:0; }
-
-        /* Chart */
         .chart-box { flex:1; position:relative; min-height:0; }
         .slots-info { margin-top:15px; padding:10px; background:#f0f7ff; border-radius:8px; display:flex; justify-content:space-around; flex-wrap:wrap; gap:10px; }
         .slot-item { text-align:center; }
         .slot-label { font-size:0.7rem; color:#666; font-weight:bold; text-transform:uppercase; }
         .slot-time { font-weight:bold; color:var(--blue); }
-
         @media(max-width:900px) { .main-split { flex-direction:column; } .menu-panel { max-width:100%; height:300px; } }
     </style>
 </head>
 <body>
-
-    <!-- TOP: CENTERED CALENDAR -->
     <div class="top-section">
         <h2>📅 Today & Tomorrow</h2>
         <div id="calendar-loading" style="color:#666; font-size:0.9rem;">Loading...</div>
         <div id="event-list" class="event-scroll" style="display:none;"></div>
     </div>
-
     <div class="main-split">
-        <!-- LEFT: MENU -->
         <div class="menu-panel">
             <div class="menu-header">
                 <h2>🍽️ This Week's Menu</h2>
-                <!-- Removed onclick, using EventListener in JS instead -->
                 <button id="edit-btn" class="edit-btn">🔒 Edit</button>
             </div>
             <div id="weekly-menu-container" class="week-scroll">
                 <div style="text-align:center; color:#999; margin-top:20px;">Connecting...</div>
             </div>
         </div>
-
-        <!-- RIGHT: ENERGY -->
         <div class="energy-panel">
             <h2>⚡ Energy Rates</h2>
             <div id="chart-loading" style="color:#666; font-size:0.9rem;">Loading...</div>
@@ -243,7 +176,7 @@
     </div>
 
     <script>
-        // --- CALENDAR LOGIC ---
+        // Calendar
         const CAL_URL = 'https://calendar.google.com/calendar/ical/8f9b2e07d9ee92bf161283dba01059fe52319cb25d9c7f941b7684d1df7a6b00%40group.calendar.google.com/private-a9281260f59e7a5711027a99de9cc8fa/basic.ics';
         fetch(`https://corsproxy.io/?${encodeURIComponent(CAL_URL)}`)
         .then(r=>r.text()).then(text=>{
@@ -253,66 +186,94 @@
                 else if(l==='END:VEVENT') { if(cur&&cur.st) events.push(cur); inEv=false; }
                 else if(!inEv) continue;
                 if(l.startsWith('SUMMARY:')) cur.s=l.substring(8);
-                else if(l.startsWith('DTSTART')) { 
-                    const v=l.split(':')[1]; 
-                    const isAllDay = (v.length===8);
-                    if(isAllDay) cur.st = new Date(`${v.substring(0,4)}-${v.substring(4,6)}-${v.substring(6,8)}`);
-                    else cur.st = new Date(`${v.substring(0,4)}-${v.substring(4,6)}-${v.substring(6,8)}T${v.substring(9,11)}:${v.substring(11,13)}:00Z`);
-                }
+                else if(l.startsWith('DTSTART')) { const v=l.split(':')[1]; cur.st = new Date(v.length>8 ? `${v.substring(0,4)}-${v.substring(4,6)}-${v.substring(6,8)}T${v.substring(9,11)}:${v.substring(11,13)}:00Z` : `${v.substring(0,4)}-${v.substring(4,6)}-${v.substring(6,8)}`); }
             }
             const now=new Date(); const startT=new Date(now.getFullYear(),now.getMonth(),now.getDate());
             const endT=new Date(startT); endT.setDate(endT.getDate()+2);
             const f=events.filter(e=>e.st && e.st<endT && e.st>=startT).sort((a,b)=>a.st-b.st);
-            
             document.getElementById('calendar-loading').style.display='none';
             const list=document.getElementById('event-list'); list.style.display='flex';
-            
-            if(f.length===0) {
-                list.innerHTML='<span style="color:#999; margin:0 auto;">No events today or tomorrow</span>';
-            } else {
-                f.forEach(e=>{
-                    const isToday = e.st.toDateString()===now.toDateString();
-                    const timeStr = e.st.getHours()===0 && e.st.getMinutes()===0 ? 'All Day' : e.st.toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});
-                    list.innerHTML+=`<div class="event-card"><span class="badge ${isToday?'badge-today':'badge-tomorrow'}">${isToday?'Today':'Tomorrow'}</span><div style="font-weight:bold">${timeStr}</div><div>${e.s}</div></div>`;
-                });
-            }
-        }).catch(()=>{ document.getElementById('calendar-loading').innerText='Error loading calendar'; });
-
-        // --- CHART LOGIC ---
-        fetch(`https://api.octopus.energy/v1/products/AGILE-24-10-01/electricity-tariffs/E-1R-AGILE-24-10-01-D/standard-unit-rates/?period_from=${new Date().toISOString()}&period_to=${new Date(Date.now()+86400000).toISOString()}`)
-        .then(r=>r.json()).then(d=>{
-            document.getElementById('chart-loading').style.display='none';
-            const ctx=document.getElementById('agileChart').getContext('2d');
-            let lb=d.results.map(r=>new Date(r.valid_from).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'}));
-            let pr=d.results.map(r=>r.value_inc_vat);
-            lb.reverse(); pr.reverse();
-            
-            new Chart(ctx,{
-                type:'bar',
-                data:{
-                    labels:lb,
-                    datasets:[{
-                        data:pr,
-                        backgroundColor:pr.map(p=>p<0?'#2196f3':p<20?'#4ade80':p<30?'#fbbf24':'#f87171'),
-                        borderRadius:4
-                    }]
-                },
-                options:{
-                    responsive:true,
-                    maintainAspectRatio:false,
-                    plugins:{legend:{display:false}},
-                    scales:{y:{beginAtZero:true}}
-                }
+            if(f.length===0) list.innerHTML='<span style="color:#999">No events</span>';
+            else f.forEach(e=>{
+                const isToday = e.st.toDateString()===now.toDateString();
+                list.innerHTML+=`<div class="event-card"><span class="badge ${isToday?'badge-today':'badge-tomorrow'}">${isToday?'Today':'Tomorrow'}</span><div style="font-weight:bold">${e.st.toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'})}</div><div>${e.s}</div></div>`;
             });
-            
-            // Slots
+        }).catch(()=>{ document.getElementById('calendar-loading').innerText='Error'; });
+
+        // --- ENERGY CHART WITH AUTO-REFRESH ---
+        let agileChart = null;
+
+        function loadEnergyData() {
+            const loading = document.getElementById('chart-loading');
+            loading.style.display = 'block';
+            loading.innerText = 'Updating...';
+
+            fetch(`https://api.octopus.energy/v1/products/AGILE-24-10-01/electricity-tariffs/E-1R-AGILE-24-10-01-D/standard-unit-rates/?period_from=${new Date().toISOString()}&period_to=${new Date(Date.now()+86400000).toISOString()}`)
+            .then(r=>r.json()).then(d=>{
+                loading.style.display = 'none';
+                const ctx = document.getElementById('agileChart').getContext('2d');
+                let lb = d.results.map(r=>new Date(r.valid_from).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'}));
+                let pr = d.results.map(r=>r.value_inc_vat);
+                lb.reverse(); pr.reverse();
+                
+                // ✅ NEW COLOR LOGIC: Dark Red for >40p
+                const colors = pr.map(p => {
+                    if (p < 0) return '#2196f3';       // Blue
+                    if (p < 20) return '#4ade80';      // Green
+                    if (p < 30) return '#fbbf24';      // Orange
+                    if (p < 40) return '#f87171';      // Red
+                    return '#b91c1c';                  // Dark Red (>40p)
+                });
+
+                if (agileChart) {
+                    agileChart.destroy(); // Destroy old chart before creating new one
+                }
+
+                agileChart = new Chart(ctx,{
+                    type:'bar',
+                    data:{
+                        labels:lb,
+                        datasets:[{
+                            data:pr,
+                            backgroundColor: colors,
+                            borderRadius:4
+                        }]
+                    },
+                    options:{
+                        responsive:true,
+                        maintainAspectRatio:false,
+                        plugins:{legend:{display:false}},
+                        scales:{
+                            y: { 
+                                beginAtZero: true,
+                                title: { display: true, text: 'Price (p/kWh)' } 
+                            }
+                        }
+                    }
+                });
+                
+                // Update Slots
+                updateSlots(pr, lb);
+            })
+            .catch(()=>{ 
+                loading.innerText = 'Error updating'; 
+                setTimeout(loadEnergyData, 60000); // Retry in 1 min if error
+            });
+        }
+
+        function updateSlots(pr, lb) {
             const find=(n)=>{ let min=Infinity, idx=-1; for(let i=0;i<=pr.length-n;i++){let s=0;for(let j=0;j<n;j++)s+=pr[i+j]; if(s<min){min=s;idx=i;}} return idx>-1?{st:lb[idx],en:lb[idx+n],av:(min/n).toFixed(1)}:null; };
             const s1=find(2), s2=find(4), s3=find(6);
             const sc=document.getElementById('slots-container'); sc.style.display='flex';
-            sc.innerHTML = (s1?`<div class="slot-item"><div class="slot-label">1 Hr</div><div class="slot-time">${s1.st}-${s1.en}</div><div class="slot-label">${s1.av}p</div></div>`:'') +
-                           (s2?`<div class="slot-item"><div class="slot-label">2 Hrs</div><div class="slot-time">${s2.st}-${s2.en}</div><div class="slot-label">${s2.av}p</div></div>`:'') +
+            sc.innerHTML = (s1?`<div class="slot-item"><div class="slot-label">1 Hr</div><div class="slot-time">${s1.st}-${s1.en}</div><div class="slot-label">${s1.av}p</div></div>`:'') + 
+                           (s2?`<div class="slot-item"><div class="slot-label">2 Hrs</div><div class="slot-time">${s2.st}-${s2.en}</div><div class="slot-label">${s2.av}p</div></div>`:'') + 
                            (s3?`<div class="slot-item"><div class="slot-label">3 Hrs</div><div class="slot-time">${s3.st}-${s3.en}</div><div class="slot-label">${s3.av}p</div></div>`:'');
-        }).catch(()=>{ document.getElementById('chart-loading').innerText='Error loading energy'; });
+        }
+
+        // ✅ AUTO-REFRESH: Load now, then every 30 minutes (1800000 ms)
+        loadEnergyData();
+        setInterval(loadEnergyData, 1800000); 
+
     </script>
 </body>
 </html>
