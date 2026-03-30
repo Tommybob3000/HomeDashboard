@@ -2,327 +2,382 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Energy & Schedule Dashboard</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Home Dashboard</title>
     
     <!-- Chart.js -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+    
+    <!-- Firebase SDK (Modular) -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-app.js";
+        import { getDatabase, ref, onValue, push, remove, set } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-database.js";
+
+        // =======================
+        // 🔥 PASTE YOUR FIREBASE CONFIG HERE
+        // =======================
+        // Your web app's Firebase configuration
+
+const firebaseConfig = {
+
+  apiKey: "AIzaSyClW1ZAVPlriZueY2EnnXrxHDtnRC8ncqQ",
+
+  authDomain: "homedashboard-7dfdd.firebaseapp.com",
+
+  projectId: "homedashboard-7dfdd",
+
+  storageBucket: "homedashboard-7dfdd.firebasestorage.app",
+
+  messagingSenderId: "727327411095",
+
+  appId: "1:727327411095:web:6d48362347a2a5d67292d2"
+
+};
+
+        // =======================
+
+        // Initialize Firebase
+        const app = initializeApp(firebaseConfig);
+        const db = getDatabase(app);
+        const menuRef = ref(db, 'menuItems');
+
+        // --- LOAD DATA (Real-time) ---
+        onValue(menuRef, (snapshot) => {
+            const listContainer = document.getElementById('menu-list');
+            listContainer.innerHTML = ''; // Clear current list
+            
+            const data = snapshot.val();
+            if (!data) {
+                listContainer.innerHTML = '<p style="color:#999; font-style:italic;">Menu is empty.</p>';
+                return;
+            }
+
+            // Convert object to array and sort by timestamp
+            const items = Object.entries(data).map(([key, value]) => ({ key, ...value }));
+            items.sort((a, b) => a.order - b.order);
+
+            items.forEach(item => {
+                const div = document.createElement('div');
+                div.className = 'menu-item';
+                div.innerHTML = `
+                    <span class="item-text">${item.text}</span>
+                    ${window.isEditMode ? `<button class="delete-btn" onclick="deleteItem('${item.key}')">&times;</button>` : ''}
+                `;
+                listContainer.appendChild(div);
+            });
+        });
+
+        // --- ADD ITEM ---
+        window.addItem = function(text) {
+            if (!text.trim()) return;
+            push(menuRef, {
+                text: text,
+                timestamp: Date.now(),
+                order: Date.now()
+            });
+        };
+
+        // --- DELETE ITEM ---
+        window.deleteItem = function(key) {
+            remove(ref(db, `menuItems/${key}`));
+        };
+        
+        // Expose functions to global scope for HTML buttons
+        window.firebaseReady = true;
+    </script>
 
     <style>
-        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; background: #f4f4f9; padding: 20px; text-align: center; }
-        .container { max-width: 800px; margin: 0 auto; background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
-        h1 { color: #333; font-size: 1.5rem; margin-bottom: 10px; }
-        h2 { color: #555; font-size: 1.2rem; margin-top: 30px; margin-bottom: 15px; border-bottom: 2px solid #eee; padding-bottom: 10px; }
-        
-        .calendar-container { min-height: 80px; margin-bottom: 30px; }
-        .event-scroll { display: flex; gap: 10px; overflow-x: auto; padding: 10px 0; justify-content: center; flex-wrap: wrap; }
-        
-        .event-card { 
-            background: #fff; 
-            border-left: 5px solid #ccc; 
-            padding: 12px 15px; 
-            border-radius: 6px; 
-            min-width: 160px; 
-            text-align: left; 
-            box-shadow: 0 2px 5px rgba(0,0,0,0.05); 
-            position: relative;
+        :root {
+            --bg: #f4f4f9;
+            --card: #ffffff;
+            --text: #333;
+            --blue: #2196f3;
+            --green: #4ade80;
+            --orange: #fbbf24;
+            --red: #f87171;
         }
-        
-        /* Day Badges */
-        .day-badge {
-            display: inline-block;
-            font-size: 0.7rem;
-            font-weight: bold;
-            text-transform: uppercase;
-            padding: 2px 6px;
-            border-radius: 4px;
-            margin-bottom: 6px;
-            color: #fff;
-        }
-        .badge-today { background-color: #4caf50; } /* Green */
-        .badge-tomorrow { background-color: #ff9800; } /* Orange */
 
-        .event-time { font-size: 0.9rem; color: #333; font-weight: bold; display: block; margin-bottom: 4px; }
-        .event-title { font-size: 0.95rem; color: #555; line-height: 1.3; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            background: var(--bg);
+            margin: 0;
+            padding: 0;
+            height: 100vh;
+            display: flex;
+            overflow: hidden; /* Tablet full screen */
+        }
+
+        /* LEFT SIDE: MENU */
+        .sidebar {
+            width: 350px;
+            background: var(--card);
+            border-right: 1px solid #ddd;
+            display: flex;
+            flex-direction: column;
+            padding: 20px;
+            box-shadow: 2px 0 10px rgba(0,0,0,0.05);
+            z-index: 10;
+        }
+
+        .sidebar-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+
+        .sidebar-header h2 { margin: 0; font-size: 1.4rem; color: var(--text); }
         
-        .no-events { color: #888; font-style: italic; }
+        .edit-toggle {
+            background: none; border: 1px solid #ccc; border-radius: 4px; cursor: pointer; padding: 5px 10px; font-size: 0.8rem;
+        }
+        .edit-toggle.active { background: var(--red); color: white; border-color: var(--red); }
+
+        .menu-input-group { display: flex; gap: 10px; margin-bottom: 20px; }
+        #new-item-input { flex: 1; padding: 10px; border: 1px solid #ddd; border-radius: 6px; font-size: 1rem; }
+        #add-btn { background: var(--blue); color: white; border: none; padding: 10px 15px; border-radius: 6px; cursor: pointer; font-weight: bold; }
+        #add-btn:disabled { background: #ccc; }
+
+        .menu-list { flex: 1; overflow-y: auto; list-style: none; padding: 0; margin: 0; }
+        .menu-item {
+            background: #f9f9f9; border-left: 4px solid var(--blue);
+            padding: 12px; margin-bottom: 10px; border-radius: 4px;
+            display: flex; justify-content: space-between; align-items: center;
+            animation: slideIn 0.3s ease;
+        }
+        .item-text { font-size: 1rem; color: var(--text); word-break: break-word; }
+        .delete-btn {
+            background: var(--red); color: white; border: none; width: 24px; height: 24px;
+            border-radius: 50%; cursor: pointer; font-weight: bold; margin-left: 10px;
+        }
+
+        /* RIGHT SIDE: DASHBOARD */
+        .main-content {
+            flex: 1;
+            padding: 20px;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        .dashboard-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            height: 100%;
+        }
+
+        .card {
+            background: var(--card);
+            border-radius: 12px;
+            padding: 20px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.05);
+            display: flex;
+            flex-direction: column;
+        }
+
+        .card h2 { margin-top: 0; font-size: 1.2rem; color: #555; border-bottom: 2px solid #eee; padding-bottom: 10px; }
+
+        /* Calendar Styles */
+        .event-scroll { display: flex; gap: 10px; overflow-x: auto; padding: 10px 0; flex-wrap: wrap; }
+        .event-card {
+            background: #e3f2fd; border-left: 4px solid var(--blue);
+            padding: 10px; border-radius: 6px; min-width: 140px; font-size: 0.9rem;
+        }
+        .badge-today { background: var(--green); color: white; padding: 2px 6px; border-radius: 4px; font-size: 0.7rem; font-weight: bold; text-transform: uppercase; }
+        .badge-tomorrow { background: var(--orange); color: white; padding: 2px 6px; border-radius: 4px; font-size: 0.7rem; font-weight: bold; text-transform: uppercase; }
+
+        /* Chart */
+        .chart-container { position: relative; height: 300px; width: 100%; }
+
+        @keyframes slideIn { from { opacity: 0; transform: translateX(-10px); } to { opacity: 1; transform: translateX(0); } }
         
-        .chart-wrapper { position: relative; height: 400px; width: 100%; }
-        .loading { color: #666; margin: 20px 0; font-style: italic; font-size: 0.9rem; }
-        .error { color: #d9534f; font-weight: bold; padding: 15px; background: #ffe6e6; border-radius: 4px; margin: 20px 0; font-size: 0.9rem; }
+        /* Mobile fallback */
+        @media (max-width: 900px) {
+            body { flex-direction: column; overflow: auto; height: auto; }
+            .sidebar { width: 100%; height: auto; box-sizing: border-box; }
+            .dashboard-grid { grid-template-columns: 1fr; }
+        }
     </style>
 </head>
 <body>
 
-<div class="container">
-    <h1>Energy & Schedule Dashboard</h1>
-
-    <h2>Upcoming Events</h2>
-    <div id="calendar-loading" class="loading">Loading calendar...</div>
-    <div id="calendar-container" class="calendar-container" style="display:none;">
-        <div id="event-list" class="event-scroll"></div>
-    </div>
-    <div id="calendar-error" class="error" style="display:none;"></div>
-
-    <h2>Octopus Agile Rates (Next 24h)</h2>
-    <div id="chart-loading" class="loading">Loading energy data...</div>
-    <div class="chart-wrapper" style="display:none;" id="chart-wrapper">
-        <canvas id="agileChart"></canvas>
-    </div>
-    <div id="chart-error" class="error" style="display:none;"></div>
-</div>
-
-<script>
-    // ================= CONFIGURATION =================
-    const TARIFF_CODE = 'E-1R-AGILE-24-10-01-D';
-    const PRODUCT_CODE = 'AGILE-24-10-01';
-    // ⚠️ SECURITY NOTE: This URL is visible to visitors. 
-    // If compromised, reset it in Google Calendar settings.
-    const CALENDAR_URL = 'https://calendar.google.com/calendar/ical/8f9b2e07d9ee92bf161283dba01059fe52319cb25d9c7f941b7684d1df7a6b00%40group.calendar.google.com/private-a9281260f59e7a5711027a99de9cc8fa/basic.ics';
-    // ===============================================
-
-    window.addEventListener('load', function() {
-        loadEnergyChart();
-        loadCalendar();
-    });
-
-    // --- LIGHTWEIGHT ICS PARSER ---
-    function parseICS(text) {
-        const events = [];
-        const lines = text.split(/\r?\n/);
-        let currentEvent = null;
-        let inEvent = false;
-
-        let cleanLines = [];
-        for (let i = 0; i < lines.length; i++) {
-            if (lines[i].startsWith(' ') || lines[i].startsWith('\t')) {
-                if (cleanLines.length > 0) cleanLines[cleanLines.length - 1] += lines[i].substring(1);
-            } else {
-                cleanLines.push(lines[i]);
-            }
-        }
-
-        for (let line of cleanLines) {
-            if (line === 'BEGIN:VEVENT') {
-                inEvent = true;
-                currentEvent = { summary: '', start: null, end: null, allDay: false };
-                continue;
-            }
-            if (line === 'END:VEVENT') {
-                if (currentEvent && currentEvent.start) events.push(currentEvent);
-                inEvent = false;
-                currentEvent = null;
-                continue;
-            }
-            if (!inEvent || !currentEvent) continue;
-
-            if (line.startsWith('SUMMARY:')) {
-                currentEvent.summary = line.substring(8).replace(/\\,/g, ',').replace(/\\n/g, ' ');
-            } else if (line.startsWith('DTSTART;') || line.startsWith('DTSTART:')) {
-                const parts = line.split(':');
-                const val = parts[1];
-                const isAllDay = (val.length === 8);
-                currentEvent.start = parseICSDate(val);
-                currentEvent.allDay = isAllDay;
-            } else if (line.startsWith('DTEND;') || line.startsWith('DTEND:')) {
-                const parts = line.split(':');
-                currentEvent.end = parseICSDate(parts[1]);
-            }
-        }
-        return events;
-    }
-
-    function parseICSDate(val) {
-        if (!val) return null;
-        const year = val.substring(0, 4);
-        const month = val.substring(4, 6);
-        const day = val.substring(6, 8);
+    <!-- LEFT: EDITABLE MENU -->
+    <div class="sidebar">
+        <div class="sidebar-header">
+            <h2>📝 Family Menu</h2>
+            <button id="edit-btn" class="edit-toggle" onclick="toggleEdit()">🔒 Edit</button>
+        </div>
         
-        if (val.length > 8) {
-            const hour = val.substring(9, 11);
-            const min = val.substring(11, 13);
-            const sec = val.substring(13, 15) || '00';
-            return new Date(`${year}-${month}-${day}T${hour}:${min}:${sec}Z`);
-        } else {
-            return new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
-        }
-    }
-    // ------------------------------
+        <div class="menu-input-group">
+            <input type="text" id="new-item-input" placeholder="Add item (e.g., Milk)..." onkeypress="if(event.key==='Enter') submitItem()">
+            <button id="add-btn" onclick="submitItem()" disabled>Add</button>
+        </div>
 
-    function loadCalendar() {
-        const loading = document.getElementById('calendar-loading');
-        const container = document.getElementById('calendar-container');
-        const errorDiv = document.getElementById('calendar-error');
-        const list = document.getElementById('event-list');
+        <div id="menu-list" class="menu-list">
+            <p style="color:#999;">Loading menu...</p>
+        </div>
+    </div>
 
-        if (!CALENDAR_URL || CALENDAR_URL.includes('YOUR_CALENDAR_ID')) {
-            if(loading) loading.style.display = 'none';
-            if(list) {
-                list.innerHTML = '<p class="no-events">Calendar URL not configured.</p>';
-                container.style.display = 'block';
-            }
-            return;
-        }
+    <!-- RIGHT: DASHBOARD -->
+    <div class="main-content">
+        <div class="dashboard-grid">
+            <!-- Calendar -->
+            <div class="card">
+                <h2>📅 Today & Tomorrow</h2>
+                <div id="calendar-loading" style="color:#666; font-style:italic;">Loading...</div>
+                <div id="event-list" class="event-scroll" style="display:none;"></div>
+                <div id="calendar-error" style="color:red; display:none;"></div>
+            </div>
 
-        const proxyUrl = `https://corsproxy.io/?${encodeURIComponent(CALENDAR_URL)}`;
+            <!-- Energy Chart -->
+            <div class="card">
+                <h2>⚡ Octopus Agile (Next 24h)</h2>
+                <div id="chart-loading" style="color:#666; font-style:italic;">Loading...</div>
+                <div class="chart-container">
+                    <canvas id="agileChart"></canvas>
+                </div>
+                <div id="chart-error" style="color:red; display:none;"></div>
+            </div>
+        </div>
+    </div>
 
-        fetch(proxyUrl)
-            .then(res => {
-                if (!res.ok) throw new Error(`Server status: ${res.status}`);
-                return res.text();
-            })
-            .then(text => {
-                if (!text || text.length < 50) throw new Error("Invalid calendar data");
-                
-                const allEvents = parseICS(text);
-                const now = new Date();
-                
-                // Define boundaries
-                const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-                const startOfTomorrow = new Date(startOfToday);
-                startOfTomorrow.setDate(startOfTomorrow.getDate() + 1);
-                const endOfTomorrow = new Date(startOfTomorrow);
-                endOfTomorrow.setDate(endOfTomorrow.getDate() + 1); // Start of day after tomorrow
+    <script>
+        // --- MENU LOGIC ---
+        let isEditMode = false;
+        const EDIT_PIN = "1234"; // Change this PIN
 
-                const filteredEvents = allEvents.filter(ev => {
-                    if (!ev.start) return false;
-                    const evEnd = ev.end || new Date(ev.start.getTime() + 3600000);
-                    // Overlap logic
-                    return ev.start < endOfTomorrow && evEnd >= startOfToday;
-                });
-
-                filteredEvents.sort((a, b) => a.start - b.start);
-                
-                if(loading) loading.style.display = 'none';
-                if(container) container.style.display = 'block';
-
-                if (filteredEvents.length === 0) {
-                    list.innerHTML = '<p class="no-events">No events today or tomorrow.</p>';
-                    return;
+        function toggleEdit() {
+            if (!window.firebaseReady) { alert("Database not connected. Check Firebase Config."); return; }
+            
+            if (!isEditMode) {
+                const pin = prompt("Enter Edit PIN:");
+                if (pin === EDIT_PIN) {
+                    isEditMode = true;
+                    document.getElementById('edit-btn').classList.add('active');
+                    document.getElementById('edit-btn').innerText = "🔓 Done";
+                    document.getElementById('add-btn').disabled = false;
+                    // Refresh list to show delete buttons
+                    // (Firebase onValue will handle re-render)
+                } else if (pin !== null) {
+                    alert("Wrong PIN");
                 }
+            } else {
+                isEditMode = false;
+                document.getElementById('edit-btn').classList.remove('active');
+                document.getElementById('edit-btn').innerText = "🔒 Edit";
+                document.getElementById('add-btn').disabled = true;
+                // Refresh list to hide delete buttons
+            }
+        }
 
-                filteredEvents.forEach(ev => {
-                    // Determine Label
-                    const isToday = ev.start >= startOfToday && ev.start < startOfTomorrow;
-                    const dayLabel = isToday ? 'Today' : 'Tomorrow';
-                    const badgeClass = isToday ? 'badge-today' : 'badge-tomorrow';
-                    const borderClass = isToday ? '#4caf50' : '#ff9800';
+        function submitItem() {
+            const input = document.getElementById('new-item-input');
+            if (window.firebaseReady && input.value.trim()) {
+                window.addItem(input.value.trim());
+                input.value = '';
+            }
+        }
 
-                    let timeStr = 'All Day';
-                    if (!ev.allDay) {
-                        const startT = ev.start.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
-                        const endT = ev.end ? ev.end.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : '';
-                        timeStr = endT ? `${startT} - ${endT}` : startT;
-                    }
+        // --- CALENDAR LOGIC (Same as before) ---
+        const CALENDAR_URL = 'https://calendar.google.com/calendar/ical/8f9b2e07d9ee92bf161283dba01059fe52319cb25d9c7f941b7684d1df7a6b00%40group.calendar.google.com/private-a9281260f59e7a5711027a99de9cc8fa/basic.ics';
+        
+        function parseICS(text) {
+            const events = [];
+            const lines = text.split(/\r?\n/);
+            let currentEvent = null;
+            let inEvent = false;
+            let cleanLines = [];
+            for (let i = 0; i < lines.length; i++) {
+                if (lines[i].startsWith(' ') || lines[i].startsWith('\t')) {
+                    if (cleanLines.length > 0) cleanLines[cleanLines.length - 1] += lines[i].substring(1);
+                } else { cleanLines.push(lines[i]); }
+            }
+            for (let line of cleanLines) {
+                if (line === 'BEGIN:VEVENT') { inEvent = true; currentEvent = { summary: '', start: null, end: null, allDay: false }; continue; }
+                if (line === 'END:VEVENT') { if (currentEvent && currentEvent.start) events.push(currentEvent); inEvent = false; continue; }
+                if (!inEvent) continue;
+                if (line.startsWith('SUMMARY:')) currentEvent.summary = line.substring(8);
+                else if (line.startsWith('DTSTART')) {
+                    const val = line.split(':')[1];
+                    currentEvent.allDay = (val.length === 8);
+                    currentEvent.start = parseDate(val);
+                }
+                else if (line.startsWith('DTEND')) currentEvent.end = parseDate(line.split(':')[1]);
+            }
+            return events;
+        }
+        function parseDate(val) {
+            if (!val) return null;
+            const y = val.substring(0,4), m = val.substring(4,6), d = val.substring(6,8);
+            if (val.length > 8) {
+                const h = val.substring(9,11), min = val.substring(11,13), s = val.substring(13,15)||'00';
+                return new Date(`${y}-${m}-${d}T${h}:${min}:${s}Z`);
+            }
+            return new Date(parseInt(y), parseInt(m)-1, parseInt(d));
+        }
 
+        fetch(`https://corsproxy.io/?${encodeURIComponent(CALENDAR_URL)}`)
+            .then(r => r.text())
+            .then(text => {
+                const events = parseICS(text);
+                const now = new Date();
+                const startToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+                const startTomorrow = new Date(startToday); startTomorrow.setDate(startTomorrow.getDate()+1);
+                const endTomorrow = new Date(startTomorrow); endTomorrow.setDate(endTomorrow.getDate()+1);
+
+                const filtered = events.filter(e => e.start && e.start < endTomorrow && (e.end || e.start) >= startToday);
+                filtered.sort((a,b) => a.start - b.start);
+
+                document.getElementById('calendar-loading').style.display = 'none';
+                const list = document.getElementById('event-list');
+                list.style.display = 'flex';
+
+                if (filtered.length === 0) { list.innerHTML = '<p style="color:#999">No events.</p>'; return; }
+
+                filtered.forEach(ev => {
+                    const isToday = ev.start >= startToday && ev.start < startTomorrow;
+                    const badge = isToday ? '<span class="badge-today">Today</span>' : '<span class="badge-tomorrow">Tomorrow</span>';
+                    const time = ev.allDay ? 'All Day' : ev.start.toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'});
                     const card = document.createElement('div');
                     card.className = 'event-card';
-                    card.style.borderLeftColor = borderClass;
-                    card.innerHTML = `
-                        <span class="day-badge ${badgeClass}">${dayLabel}</span>
-                        <span class="event-time">${timeStr}</span>
-                        <div class="event-title">${ev.summary || 'No Title'}</div>
-                    `;
+                    card.innerHTML = `${badge}<div style="font-weight:bold; margin-top:4px;">${time}</div><div>${ev.summary}</div>`;
                     list.appendChild(card);
                 });
             })
-            .catch(err => {
-                console.warn("Calendar failed:", err.message);
-                if(loading) loading.style.display = 'none';
-                if(errorDiv) {
-                    errorDiv.textContent = "Calendar unavailable: " + err.message;
-                    errorDiv.style.display = 'block';
-                }
+            .catch(e => {
+                document.getElementById('calendar-loading').style.display = 'none';
+                document.getElementById('calendar-error').innerText = "Calendar Error";
+                document.getElementById('calendar-error').style.display = 'block';
             });
-    }
 
-    function loadEnergyChart() {
-        const loading = document.getElementById('chart-loading');
-        const chartWrapper = document.getElementById('chart-wrapper');
-        const errorDiv = document.getElementById('chart-error');
-        const canvas = document.getElementById('agileChart');
-
-        if (typeof Chart === 'undefined') {
-            if(loading) loading.style.display = 'none';
-            if(errorDiv) {
-                errorDiv.textContent = "Chart library failed to load.";
-                errorDiv.style.display = 'block';
-            }
-            return;
-        }
-
-        if (!TARIFF_CODE || TARIFF_CODE.includes('REPLACE')) {
-            if(loading) loading.style.display = 'none';
-            if(errorDiv) {
-                errorDiv.textContent = "Tariff code not configured.";
-                errorDiv.style.display = 'block';
-            }
-            return;
-        }
-
-        const now = new Date();
-        const from = now.toISOString();
-        const to = new Date(now.getTime() + 24 * 60 * 60 * 1000).toISOString();
-        const url = `https://api.octopus.energy/v1/products/${PRODUCT_CODE}/electricity-tariffs/${TARIFF_CODE}/standard-unit-rates/?period_from=${from}&period_to=${to}`;
-
-        fetch(url)
-            .then(res => {
-                if (!res.ok) {
-                    if (res.status === 404) throw new Error("Invalid Tariff Code");
-                    throw new Error(`API Error: ${res.status}`);
-                }
-                return res.json();
-            })
+        // --- CHART LOGIC ---
+        const TARIFF_CODE = 'E-1R-AGILE-24-10-01-D';
+        const PRODUCT_CODE = 'AGILE-24-10-01';
+        
+        fetch(`https://api.octopus.energy/v1/products/${PRODUCT_CODE}/electricity-tariffs/${TARIFF_CODE}/standard-unit-rates/?period_from=${new Date().toISOString()}&period_to=${new Date(Date.now()+86400000).toISOString()}`)
+            .then(r => r.json())
             .then(data => {
-                if(loading) loading.style.display = 'none';
-                if(chartWrapper) chartWrapper.style.display = 'block';
-
-                let labels = data.results.map(r => new Date(r.valid_from).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
+                document.getElementById('chart-loading').style.display = 'none';
+                const ctx = document.getElementById('agileChart').getContext('2d');
+                let labels = data.results.map(r => new Date(r.valid_from).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'}));
                 let prices = data.results.map(r => r.value_inc_vat);
+                labels.reverse(); prices.reverse();
+                
+                const colors = prices.map(p => p < 0 ? '#2196f3' : p < 20 ? '#4ade80' : p < 30 ? '#fbbf24' : '#f87171');
 
-                labels.reverse();
-                prices.reverse();
-
-                const colors = prices.map(p => {
-                    if (p < 0) return '#2196f3';      
-                    if (p < 20) return '#4ade80';     
-                    if (p < 30) return '#fbbf24';     
-                    return '#f87171';                 
-                });
-
-                new Chart(canvas.getContext('2d'), {
+                new Chart(ctx, {
                     type: 'bar',
-                    data: {
-                        labels: labels,
-                        datasets: [{
-                            label: 'Price (p/kWh)',
-                            data: prices,
-                            backgroundColor: colors,
-                            borderRadius: 4,
-                            barPercentage: 0.8
-                        }]
-                    },
-                    options: {
-                        responsive: true,
-                        maintainAspectRatio: false,
-                        plugins: { legend: { display: false } },
-                        scales: {
-                            y: { beginAtZero: false, title: { display: true, text: 'Price (pence)' } },
-                            x: { ticks: { maxRotation: 45, minRotation: 45 } }
-                        }
-                    }
+                    data: { labels: labels, datasets: [{ label: 'p/kWh', data: prices, backgroundColor: colors, borderRadius: 4 }] },
+                    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: {display:false} }, scales: { y: { beginAtZero: false } } }
                 });
             })
-            .catch(err => {
-                console.error("Chart Error:", err);
-                if(loading) loading.style.display = 'none';
-                if(errorDiv) {
-                    errorDiv.textContent = "Energy Error: " + err.message;
-                    errorDiv.style.display = 'block';
-                }
+            .catch(e => {
+                document.getElementById('chart-loading').style.display = 'none';
+                document.getElementById('chart-error').innerText = "Energy Error";
+                document.getElementById('chart-error').style.display = 'block';
             });
-    }
-</script>
-
+    </script>
 </body>
 </html>
