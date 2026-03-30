@@ -77,7 +77,7 @@
         function toggleEdit() {
             if (!db) { alert("Database not connected"); return; }
             if (!isEditMode) {
-                const pin = prompt("Enter PIN (1234):");
+                const pin = prompt("Enter PIN:");
                 if (pin === "1234") {
                     isEditMode = true;
                     document.getElementById('edit-btn').classList.add('active');
