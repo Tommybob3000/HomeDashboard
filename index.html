@@ -4,17 +4,13 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Energy & Schedule Dashboard</title>
-    <!-- Chart.js -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <!-- ICAL.js Parser -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/ical.js/1.5.0/ical.min.js"></script>
     <style>
         body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; background: #f4f4f9; padding: 20px; text-align: center; }
         .container { max-width: 800px; margin: 0 auto; background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
         h1 { color: #333; font-size: 1.5rem; margin-bottom: 10px; }
         h2 { color: #555; font-size: 1.2rem; margin-top: 30px; margin-bottom: 15px; border-bottom: 2px solid #eee; padding-bottom: 10px; }
-        
-        /* Calendar Styles */
         .calendar-container { min-height: 80px; margin-bottom: 30px; }
         .event-scroll { display: flex; gap: 10px; overflow-x: auto; padding: 10px 0; justify-content: center; flex-wrap: wrap; }
         .event-card { background: #e3f2fd; border-left: 4px solid #2196f3; padding: 10px 15px; border-radius: 4px; min-width: 150px; text-align: left; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
@@ -23,8 +19,6 @@
         .event-today { background: #e8f5e9; border-left-color: #4caf50; }
         .event-tomorrow { background: #fff3e0; border-left-color: #ff9800; }
         .no-events { color: #888; font-style: italic; }
-
-        /* Chart Styles */
         .chart-wrapper { position: relative; height: 400px; width: 100%; }
         .loading { color: #666; margin: 20px 0; font-style: italic; font-size: 0.9rem; }
         .error { color: #d9534f; font-weight: bold; padding: 15px; background: #ffe6e6; border-radius: 4px; margin: 20px 0; font-size: 0.9rem; }
@@ -35,7 +29,6 @@
 <div class="container">
     <h1>Energy & Schedule Dashboard</h1>
 
-    <!-- CALENDAR SECTION -->
     <h2>Upcoming Events (Today & Tomorrow)</h2>
     <div id="calendar-loading" class="loading">Loading calendar...</div>
     <div id="calendar-container" class="calendar-container" style="display:none;">
@@ -43,7 +36,6 @@
     </div>
     <div id="calendar-error" class="error" style="display:none;"></div>
 
-    <!-- CHART SECTION -->
     <h2>Octopus Agile Rates (Next 24h)</h2>
     <div id="chart-loading" class="loading">Loading energy data...</div>
     <div class="chart-wrapper" style="display:none;" id="chart-wrapper">
@@ -53,83 +45,50 @@
 </div>
 
 <script>
-    // ==========================================
-    // 1. GLOBAL CONFIGURATION
-    // ==========================================
-    
-    // --- EDIT THESE THREE LINES ONLY ---
-    const TARIFF_CODE = 'E-1R-AGILE-24-10-01-D'; 
+    // ================= CONFIGURATION =================
+    const TARIFF_CODE = 'E-1R-AGILE-24-10-01-D';
     const PRODUCT_CODE = 'AGILE-24-10-01';
     const CALENDAR_URL = 'https://calendar.google.com/calendar/ical/8f9b2e07d9ee92bf161283dba01059fe52319cb25d9c7f941b7684d1df7a6b00%40group.calendar.google.com/private-a9281260f59e7a5711027a99de9cc8fa/basic.ics';
-    // -----------------------------------
-
-    // ==========================================
-    // 2. SYSTEM LOGIC (DO NOT EDIT BELOW)
-    // ==========================================
+    // ===============================================
 
     document.addEventListener('DOMContentLoaded', function() {
+        // Load Chart FIRST (it's more important and doesn't need a proxy)
+        loadEnergyChart();
         
-        // --- Load Calendar ---
-        // We pass the variable CALENDAR_URL defined above
-        try {
-            loadCalendar(CALENDAR_URL);
-        } catch (e) {
-            console.error("Calendar Init Error:", e);
-            showError('calendar-error', 'calendar-loading', 'Calendar setup failed.');
-        }
-
-        // --- Load Energy Chart ---
-        // We pass TARIFF_CODE and PRODUCT_CODE defined above
-        try {
-            loadEnergyChart(TARIFF_CODE, PRODUCT_CODE);
-        } catch (e) {
-            console.error("Chart Init Error:", e);
-            showError('chart-error', 'chart-loading', 'Chart setup failed.');
-        }
+        // Load Calendar SECOND (if it fails, chart still works)
+        loadCalendar();
     });
 
-    // Helper to show errors
-    function showError(errorId, loadingId, message) {
-        const loadEl = document.getElementById(loadingId);
-        const errEl = document.getElementById(errorId);
-        if(loadEl) loadEl.style.display = 'none';
-        if(errEl) {
-            errEl.textContent = message;
-            errEl.style.display = 'block';
-        }
-    }
-
-    // --- CALENDAR LOGIC ---
-    function loadCalendar(rawUrl) {
+    function loadCalendar() {
         const loading = document.getElementById('calendar-loading');
         const container = document.getElementById('calendar-container');
         const errorDiv = document.getElementById('calendar-error');
         const list = document.getElementById('event-list');
 
-        if (!rawUrl || rawUrl.includes('YOUR_CALENDAR_ID')) {
-            if(loading) loading.style.display = 'none';
-            if(list) {
-                list.innerHTML = '<p class="no-events">Edit HTML to add Calendar URL.</p>';
-                container.style.display = 'block';
-            }
+        if (!CALENDAR_URL || CALENDAR_URL.includes('YOUR_CALENDAR_ID')) {
+            loading.style.display = 'none';
+            list.innerHTML = '<p class="no-events">Calendar URL not configured.</p>';
+            container.style.display = 'block';
             return;
         }
 
-        // Use AllOrigins proxy to bypass CORS
-        const proxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(rawUrl)}`;
+        // Switched to corsproxy.io (more reliable than allorigins)
+        const proxyUrl = `https://corsproxy.io/?${encodeURIComponent(CALENDAR_URL)}`;
 
         if (typeof ICAL === 'undefined') {
-            showError('calendar-error', 'calendar-loading', 'Calendar library failed to load.');
+            loading.style.display = 'none';
+            errorDiv.textContent = "Calendar library failed to load.";
+            errorDiv.style.display = 'block';
             return;
         }
 
         fetch(proxyUrl)
             .then(res => {
-                if (!res.ok) throw new Error(`Status: ${res.status}`);
+                if (!res.ok) throw new Error(`Server status: ${res.status}`);
                 return res.text();
             })
             .then(text => {
-                if (!text || text.length < 50) throw new Error("Empty calendar data");
+                if (!text || text.length < 50) throw new Error("Invalid calendar data");
                 
                 const jcalData = ICAL.parse(text);
                 const comp = new ICAL.Component(jcalData);
@@ -137,7 +96,7 @@
                 
                 const now = new Date();
                 const tomorrow = new Date(now);
-                tomorrow.setDate(tomorrow.getDate() + 2); 
+                tomorrow.setDate(tomorrow.getDate() + 2);
 
                 let events = [];
                 vevents.forEach(vevent => {
@@ -153,16 +112,15 @@
                                 isToday: start.toDateString() === now.toDateString()
                             });
                         }
-                    } catch (e) { console.warn("Skipped bad event", e); }
+                    } catch (e) { /* Skip bad events */ }
                 });
 
                 events.sort((a, b) => a.start - b.start);
-
-                if(loading) loading.style.display = 'none';
-                if(container) container.style.display = 'block';
+                loading.style.display = 'none';
+                container.style.display = 'block';
 
                 if (events.length === 0) {
-                    list.innerHTML = '<p class="no-events">No events for today/tomorrow.</p>';
+                    list.innerHTML = '<p class="no-events">No events today/tomorrow.</p>';
                     return;
                 }
 
@@ -171,4 +129,21 @@
                                     ev.end.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
                     const card = document.createElement('div');
                     card.className = `event-card ${ev.isToday ? 'event-today' : 'event-tomorrow'}`;
-                    card.innerHTML = `<span class="event-time">${timeStr}</span
+                    card.innerHTML = `<span class="event-time">$${timeStr}</span><div class="event-title">$${ev.summary}</div>`;
+                    list.appendChild(card);
+                });
+            })
+            .catch(err => {
+                console.warn("Calendar failed (Chart will still load):", err.message);
+                loading.style.display = 'none';
+                errorDiv.textContent = "Calendar unavailable: " + err.message;
+                errorDiv.style.display = 'block';
+                // Do NOT stop execution - let the chart load!
+            });
+    }
+
+    function loadEnergyChart() {
+        const loading = document.getElementById('chart-loading');
+        const chartWrapper = document.getElementById('chart-wrapper');
+        const errorDiv = document.getElementById('chart-error');
+        const canvas = document.getElementById
