@@ -5,11 +5,11 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Energy & Schedule Dashboard</title>
     
-    <!-- UPDATED: Chart.js to latest stable v4 -->
+    <!-- Chart.js (Standard Script) -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
     
-    <!-- UPDATED: ICAL.js to latest stable v2.0.1 -->
-    <script src="https://cdn.jsdelivr.net/npm/ical.js@2.0.1/dist/ical.min.js"></script>
+    <!-- ICAL.js v1.5.0 (Stable Standard Script - NOT a module) -->
+    <script src="https://unpkg.com/ical.js@1.5.0/dist/ical.min.js"></script>
 
     <style>
         body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; background: #f4f4f9; padding: 20px; text-align: center; }
@@ -56,7 +56,7 @@
     const CALENDAR_URL = 'https://calendar.google.com/calendar/ical/8f9b2e07d9ee92bf161283dba01059fe52319cb25d9c7f941b7684d1df7a6b00%40group.calendar.google.com/private-a9281260f59e7a5711027a99de9cc8fa/basic.ics';
     // ===============================================
 
-    // Wait for libraries to be fully ready
+    // Wait for full page load (ensures libraries are ready)
     window.addEventListener('load', function() {
         loadEnergyChart();
         loadCalendar();
@@ -69,17 +69,21 @@
         const list = document.getElementById('event-list');
 
         if (!CALENDAR_URL || CALENDAR_URL.includes('YOUR_CALENDAR_ID')) {
-            loading.style.display = 'none';
-            list.innerHTML = '<p class="no-events">Calendar URL not configured.</p>';
-            container.style.display = 'block';
+            if(loading) loading.style.display = 'none';
+            if(list) {
+                list.innerHTML = '<p class="no-events">Calendar URL not configured.</p>';
+                container.style.display = 'block';
+            }
             return;
         }
 
-        // Safety check for library
+        // Check if library loaded correctly
         if (typeof ICAL === 'undefined') {
-            loading.style.display = 'none';
-            errorDiv.textContent = "Calendar library blocked by extension? Try Incognito mode.";
-            errorDiv.style.display = 'block';
+            if(loading) loading.style.display = 'none';
+            if(errorDiv) {
+                errorDiv.textContent = "Error: Calendar library failed to load. Check internet connection.";
+                errorDiv.style.display = 'block';
+            }
             return;
         }
 
@@ -110,4 +114,125 @@
                         if (start < tomorrow) {
                             events.push({
                                 summary: event.summary || 'Event',
-                                start: start
+                                start: start,
+                                end: end,
+                                isToday: start.toDateString() === now.toDateString()
+                            });
+                        }
+                    } catch (e) { console.warn("Skipped event", e); }
+                });
+
+                events.sort((a, b) => a.start - b.start);
+                
+                if(loading) loading.style.display = 'none';
+                if(container) container.style.display = 'block';
+
+                if (events.length === 0) {
+                    list.innerHTML = '<p class="no-events">No events today/tomorrow.</p>';
+                    return;
+                }
+
+                events.forEach(ev => {
+                    const timeStr = ev.start.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) + ' - ' + 
+                                    ev.end.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+                    const card = document.createElement('div');
+                    card.className = `event-card ${ev.isToday ? 'event-today' : 'event-tomorrow'}`;
+                    card.innerHTML = `<span class="event-time">${timeStr}</span><div class="event-title">${ev.summary}</div>`;
+                    list.appendChild(card);
+                });
+            })
+            .catch(err => {
+                console.warn("Calendar failed:", err.message);
+                if(loading) loading.style.display = 'none';
+                if(errorDiv) {
+                    errorDiv.textContent = "Calendar unavailable: " + err.message;
+                    errorDiv.style.display = 'block';
+                }
+            });
+    }
+
+    function loadEnergyChart() {
+        const loading = document.getElementById('chart-loading');
+        const chartWrapper = document.getElementById('chart-wrapper');
+        const errorDiv = document.getElementById('chart-error');
+        const canvas = document.getElementById('agileChart');
+
+        if (typeof Chart === 'undefined') {
+            if(loading) loading.style.display = 'none';
+            if(errorDiv) {
+                errorDiv.textContent = "Error: Chart library failed to load.";
+                errorDiv.style.display = 'block';
+            }
+            return;
+        }
+
+        if (!TARIFF_CODE || TARIFF_CODE.includes('REPLACE')) {
+            if(loading) loading.style.display = 'none';
+            if(errorDiv) {
+                errorDiv.textContent = "Tariff code not configured.";
+                errorDiv.style.display = 'block';
+            }
+            return;
+        }
+
+        const now = new Date();
+        const from = now.toISOString();
+        const to = new Date(now.getTime() + 24 * 60 * 60 * 1000).toISOString();
+        const url = `https://api.octopus.energy/v1/products/${PRODUCT_CODE}/electricity-tariffs/${TARIFF_CODE}/standard-unit-rates/?period_from=${from}&period_to=${to}`;
+
+        fetch(url)
+            .then(res => {
+                if (!res.ok) {
+                    if (res.status === 404) throw new Error("Invalid Tariff Code");
+                    throw new Error(`API Error: ${res.status}`);
+                }
+                return res.json();
+            })
+            .then(data => {
+                if(loading) loading.style.display = 'none';
+                if(chartWrapper) chartWrapper.style.display = 'block';
+
+                let labels = data.results.map(r => new Date(r.valid_from).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
+                let prices = data.results.map(r => r.value_inc_vat);
+
+                labels.reverse();
+                prices.reverse();
+
+                const colors = prices.map(p => p < 10 ? '#4ade80' : p < 20 ? '#fbbf24' : '#f87171');
+
+                new Chart(canvas.getContext('2d'), {
+                    type: 'bar',
+                    data: {
+                        labels: labels,
+                        datasets: [{
+                            label: 'Price (p/kWh)',
+                            data: prices,
+                            backgroundColor: colors,
+                            borderRadius: 4,
+                            barPercentage: 0.8
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: { legend: { display: false } },
+                        scales: {
+                            y: { beginAtZero: true, title: { display: true, text: 'Price (pence)' } },
+                            x: { ticks: { maxRotation: 45, minRotation: 45 } }
+                        }
+                    }
+                });
+            })
+            .catch(err => {
+                console.error("Chart Error:", err);
+                if(loading) loading.style.display = 'none';
+                if(errorDiv) {
+                    errorDiv.textContent = "Energy Error: " + err.message;
+                    errorDiv.style.display = 'block';
+                }
+            });
+    }
+</script>
+
+</body>
+</html>
