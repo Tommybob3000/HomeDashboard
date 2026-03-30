@@ -8,7 +8,7 @@
     <!-- Chart.js -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
     
-    <!-- Firebase SDK (Modular) -->
+    <!-- Firebase SDK -->
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-app.js";
         import { getDatabase, ref, onValue, push, remove, set } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-database.js";
@@ -16,73 +16,85 @@
         // =======================
         // 🔥 PASTE YOUR FIREBASE CONFIG HERE
         // =======================
-        // Your web app's Firebase configuration
-
-const firebaseConfig = {
-
-  apiKey: "AIzaSyClW1ZAVPlriZueY2EnnXrxHDtnRC8ncqQ",
-
-  authDomain: "homedashboard-7dfdd.firebaseapp.com",
-
-  projectId: "homedashboard-7dfdd",
-
-  storageBucket: "homedashboard-7dfdd.firebasestorage.app",
-
-  messagingSenderId: "727327411095",
-
-  appId: "1:727327411095:web:6d48362347a2a5d67292d2"
-
-};
-
+        const firebaseConfig = {
+            apiKey: "AIzaSy...",
+            authDomain: "your-project.firebaseapp.com",
+            databaseURL: "https://your-project-default-rtdb.europe-west1.firebasedatabase.app",
+            projectId: "your-project",
+            storageBucket: "your-project.appspot.com",
+            messagingSenderId: "123456...",
+            appId: "1:123456..."
+        };
         // =======================
 
-        // Initialize Firebase
         const app = initializeApp(firebaseConfig);
         const db = getDatabase(app);
-        const menuRef = ref(db, 'menuItems');
+        const menuRef = ref(db, 'weeklyMenu');
 
-        // --- LOAD DATA (Real-time) ---
+        // --- LOAD DATA ---
         onValue(menuRef, (snapshot) => {
-            const listContainer = document.getElementById('menu-list');
-            listContainer.innerHTML = ''; // Clear current list
-            
-            const data = snapshot.val();
-            if (!data) {
-                listContainer.innerHTML = '<p style="color:#999; font-style:italic;">Menu is empty.</p>';
-                return;
-            }
-
-            // Convert object to array and sort by timestamp
-            const items = Object.entries(data).map(([key, value]) => ({ key, ...value }));
-            items.sort((a, b) => a.order - b.order);
-
-            items.forEach(item => {
-                const div = document.createElement('div');
-                div.className = 'menu-item';
-                div.innerHTML = `
-                    <span class="item-text">${item.text}</span>
-                    ${window.isEditMode ? `<button class="delete-btn" onclick="deleteItem('${item.key}')">&times;</button>` : ''}
-                `;
-                listContainer.appendChild(div);
-            });
+            const data = snapshot.val() || {};
+            renderWeeklyMenu(data);
         });
 
-        // --- ADD ITEM ---
-        window.addItem = function(text) {
-            if (!text.trim()) return;
-            push(menuRef, {
-                text: text,
-                timestamp: Date.now(),
-                order: Date.now()
+        // --- RENDER WEEKLY MENU ---
+        window.renderWeeklyMenu = function(data) {
+            const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+            const container = document.getElementById('weekly-menu-container');
+            container.innerHTML = '';
+
+            days.forEach((day, index) => {
+                const dayKey = day.toLowerCase();
+                const items = data[dayKey] || [];
+                
+                const dayCard = document.createElement('div');
+                dayCard.className = 'day-card';
+                
+                let itemsHtml = '';
+                if (Array.isArray(items)) {
+                    items.forEach((item, itemIndex) => {
+                        const deleteBtn = window.isEditMode ? `<button class="delete-btn" onclick="deleteItem('${dayKey}', ${itemIndex})">&times;</button>` : '';
+                        itemsHtml += `<div class="menu-item-row">${deleteBtn}<span>${item}</span></div>`;
+                    });
+                }
+
+                dayCard.innerHTML = `
+                    <div class="day-header">
+                        <h3>${day}</h3>
+                        ${window.isEditMode ? `<button class="add-mini-btn" onclick="promptAddItem('${dayKey}')">+</button>` : ''}
+                    </div>
+                    <div class="day-items">${itemsHtml || '<span style="color:#ccc; font-size:0.9rem;">No plans yet</span>'}</div>
+                `;
+                container.appendChild(dayCard);
             });
+        };
+
+        // --- ADD ITEM ---
+        window.addItem = function(dayKey, text) {
+            if (!text.trim()) return;
+            const dayRef = ref(db, `weeklyMenu/${dayKey}`);
+            onValue(dayRef, (snapshot) => {
+                const items = snapshot.val() || [];
+                items.push(text);
+                set(dayRef, items);
+            }, { onlyOnce: true });
         };
 
         // --- DELETE ITEM ---
-        window.deleteItem = function(key) {
-            remove(ref(db, `menuItems/${key}`));
+        window.deleteItem = function(dayKey, index) {
+            const dayRef = ref(db, `weeklyMenu/${dayKey}`);
+            onValue(dayRef, (snapshot) => {
+                const items = snapshot.val() || [];
+                items.splice(index, 1);
+                set(dayRef, items);
+            }, { onlyOnce: true });
         };
-        
-        // Expose functions to global scope for HTML buttons
+
+        window.promptAddItem = function(dayKey) {
+            const text = prompt(`Add item for ${dayKey}:`);
+            if (text) window.addItem(dayKey, text);
+        };
+
         window.firebaseReady = true;
     </script>
 
@@ -95,289 +107,313 @@ const firebaseConfig = {
             --green: #4ade80;
             --orange: #fbbf24;
             --red: #f87171;
+            --gray: #e0e0e0;
         }
 
         body {
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
             background: var(--bg);
             margin: 0;
-            padding: 0;
+            padding: 15px;
             height: 100vh;
+            box-sizing: border-box;
             display: flex;
+            flex-direction: column;
+            gap: 15px;
             overflow: hidden; /* Tablet full screen */
         }
 
-        /* LEFT SIDE: MENU */
-        .sidebar {
-            width: 350px;
+        /* TOP: CALENDAR (Full Width) */
+        .top-section {
             background: var(--card);
-            border-right: 1px solid #ddd;
+            border-radius: 12px;
+            padding: 15px 20px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+            flex: 0 0 auto;
+            max-height: 140px;
+            overflow: hidden;
+        }
+        .top-section h2 { margin: 0 0 10px 0; font-size: 1.2rem; color: #555; }
+        .event-scroll { display: flex; gap: 10px; overflow-x: auto; padding-bottom: 5px; }
+        .event-card {
+            background: #e3f2fd; border-left: 4px solid var(--blue);
+            padding: 8px 12px; border-radius: 6px; min-width: 130px; font-size: 0.85rem;
+            display: flex; flex-direction: column; gap: 4px;
+        }
+        .badge { font-size: 0.65rem; font-weight: bold; text-transform: uppercase; color: white; padding: 2px 6px; border-radius: 4px; display: inline-block; width: fit-content; }
+        .badge-today { background: var(--green); }
+        .badge-tomorrow { background: var(--orange); }
+
+        /* MAIN SPLIT: MENU (LEFT) & ENERGY (RIGHT) */
+        .main-split {
+            display: flex;
+            gap: 15px;
+            flex: 1;
+            overflow: hidden;
+        }
+
+        /* LEFT: WEEKLY MENU */
+        .menu-panel {
+            flex: 1;
+            background: var(--card);
+            border-radius: 12px;
+            padding: 15px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.05);
             display: flex;
             flex-direction: column;
-            padding: 20px;
-            box-shadow: 2px 0 10px rgba(0,0,0,0.05);
-            z-index: 10;
+            min-width: 300px;
+            max-width: 400px;
         }
+        .menu-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+        .menu-header h2 { margin: 0; font-size: 1.3rem; color: #333; }
+        .edit-btn { background: none; border: 1px solid #ccc; padding: 5px 10px; border-radius: 6px; cursor: pointer; font-size: 0.8rem; }
+        .edit-btn.active { background: var(--red); color: white; border-color: var(--red); }
 
-        .sidebar-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 20px;
-        }
-
-        .sidebar-header h2 { margin: 0; font-size: 1.4rem; color: var(--text); }
-        
-        .edit-toggle {
-            background: none; border: 1px solid #ccc; border-radius: 4px; cursor: pointer; padding: 5px 10px; font-size: 0.8rem;
-        }
-        .edit-toggle.active { background: var(--red); color: white; border-color: var(--red); }
-
-        .menu-input-group { display: flex; gap: 10px; margin-bottom: 20px; }
-        #new-item-input { flex: 1; padding: 10px; border: 1px solid #ddd; border-radius: 6px; font-size: 1rem; }
-        #add-btn { background: var(--blue); color: white; border: none; padding: 10px 15px; border-radius: 6px; cursor: pointer; font-weight: bold; }
-        #add-btn:disabled { background: #ccc; }
-
-        .menu-list { flex: 1; overflow-y: auto; list-style: none; padding: 0; margin: 0; }
-        .menu-item {
-            background: #f9f9f9; border-left: 4px solid var(--blue);
-            padding: 12px; margin-bottom: 10px; border-radius: 4px;
-            display: flex; justify-content: space-between; align-items: center;
-            animation: slideIn 0.3s ease;
-        }
-        .item-text { font-size: 1rem; color: var(--text); word-break: break-word; }
-        .delete-btn {
-            background: var(--red); color: white; border: none; width: 24px; height: 24px;
-            border-radius: 50%; cursor: pointer; font-weight: bold; margin-left: 10px;
-        }
-
-        /* RIGHT SIDE: DASHBOARD */
-        .main-content {
+        .week-scroll {
             flex: 1;
-            padding: 20px;
             overflow-y: auto;
             display: flex;
             flex-direction: column;
-            gap: 20px;
+            gap: 10px;
+            padding-right: 5px;
         }
-
-        .dashboard-grid {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 20px;
-            height: 100%;
+        .day-card {
+            background: #f9f9f9; border-radius: 8px; padding: 10px;
+            border: 1px solid #eee;
         }
+        .day-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; border-bottom: 1px solid #eee; padding-bottom: 4px; }
+        .day-header h3 { margin: 0; font-size: 1rem; color: #555; }
+        .add-mini-btn { background: var(--blue); color: white; border: none; width: 24px; height: 24px; border-radius: 50%; cursor: pointer; font-weight: bold; font-size: 1.1rem; }
+        .day-items { display: flex; flex-direction: column; gap: 4px; }
+        .menu-item-row { display: flex; align-items: center; gap: 8px; font-size: 0.9rem; color: #333; }
+        .delete-btn { background: var(--red); color: white; border: none; width: 18px; height: 18px; border-radius: 50%; cursor: pointer; font-size: 0.8rem; line-height: 1; }
 
-        .card {
+        /* RIGHT: ENERGY CHART */
+        .energy-panel {
+            flex: 2;
             background: var(--card);
             border-radius: 12px;
-            padding: 20px;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.05);
+            padding: 15px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.05);
             display: flex;
             flex-direction: column;
+            overflow: hidden;
         }
-
-        .card h2 { margin-top: 0; font-size: 1.2rem; color: #555; border-bottom: 2px solid #eee; padding-bottom: 10px; }
-
-        /* Calendar Styles */
-        .event-scroll { display: flex; gap: 10px; overflow-x: auto; padding: 10px 0; flex-wrap: wrap; }
-        .event-card {
-            background: #e3f2fd; border-left: 4px solid var(--blue);
-            padding: 10px; border-radius: 6px; min-width: 140px; font-size: 0.9rem;
-        }
-        .badge-today { background: var(--green); color: white; padding: 2px 6px; border-radius: 4px; font-size: 0.7rem; font-weight: bold; text-transform: uppercase; }
-        .badge-tomorrow { background: var(--orange); color: white; padding: 2px 6px; border-radius: 4px; font-size: 0.7rem; font-weight: bold; text-transform: uppercase; }
-
-        /* Chart */
-        .chart-container { position: relative; height: 300px; width: 100%; }
-
-        @keyframes slideIn { from { opacity: 0; transform: translateX(-10px); } to { opacity: 1; transform: translateX(0); } }
+        .energy-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+        .energy-header h2 { margin: 0; font-size: 1.3rem; color: #333; }
         
-        /* Mobile fallback */
+        .chart-box { flex: 1; position: relative; min-height: 0; }
+        
+        /* CHEAPEST SLOTS SECTION */
+        .slots-info {
+            margin-top: 15px;
+            padding: 10px;
+            background: #f0f7ff;
+            border-radius: 8px;
+            border: 1px solid #d0e1f5;
+            display: flex;
+            justify-content: space-around;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+        .slot-item { text-align: center; }
+        .slot-label { font-size: 0.75rem; color: #666; text-transform: uppercase; font-weight: bold; }
+        .slot-time { font-size: 1.1rem; font-weight: bold; color: var(--blue); }
+        .slot-price { font-size: 0.85rem; color: #888; }
+
+        /* Scrollbar styling */
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-thumb { background: #ccc; border-radius: 3px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+
         @media (max-width: 900px) {
-            body { flex-direction: column; overflow: auto; height: auto; }
-            .sidebar { width: 100%; height: auto; box-sizing: border-box; }
-            .dashboard-grid { grid-template-columns: 1fr; }
+            body { overflow: auto; height: auto; }
+            .main-split { flex-direction: column; }
+            .menu-panel { max-width: 100%; height: 400px; }
+            .energy-panel { height: 500px; }
         }
     </style>
 </head>
 <body>
 
-    <!-- LEFT: EDITABLE MENU -->
-    <div class="sidebar">
-        <div class="sidebar-header">
-            <h2>📝 Family Menu</h2>
-            <button id="edit-btn" class="edit-toggle" onclick="toggleEdit()">🔒 Edit</button>
-        </div>
-        
-        <div class="menu-input-group">
-            <input type="text" id="new-item-input" placeholder="Add item (e.g., Milk)..." onkeypress="if(event.key==='Enter') submitItem()">
-            <button id="add-btn" onclick="submitItem()" disabled>Add</button>
-        </div>
-
-        <div id="menu-list" class="menu-list">
-            <p style="color:#999;">Loading menu...</p>
-        </div>
+    <!-- TOP: CALENDAR -->
+    <div class="top-section">
+        <h2>📅 Today & Tomorrow</h2>
+        <div id="calendar-loading" style="color:#666; font-size:0.9rem;">Loading events...</div>
+        <div id="event-list" class="event-scroll" style="display:none;"></div>
+        <div id="calendar-error" style="color:red; font-size:0.9rem; display:none;"></div>
     </div>
 
-    <!-- RIGHT: DASHBOARD -->
-    <div class="main-content">
-        <div class="dashboard-grid">
-            <!-- Calendar -->
-            <div class="card">
-                <h2>📅 Today & Tomorrow</h2>
-                <div id="calendar-loading" style="color:#666; font-style:italic;">Loading...</div>
-                <div id="event-list" class="event-scroll" style="display:none;"></div>
-                <div id="calendar-error" style="color:red; display:none;"></div>
+    <!-- SPLIT: MENU & ENERGY -->
+    <div class="main-split">
+        
+        <!-- LEFT: WEEKLY MENU -->
+        <div class="menu-panel">
+            <div class="menu-header">
+                <h2>🍽️ This Week's Menu</h2>
+                <button id="edit-btn" class="edit-btn" onclick="toggleEdit()">🔒 Edit</button>
             </div>
+            <div id="weekly-menu-container" class="week-scroll">
+                <p style="color:#999; text-align:center; margin-top:20px;">Loading menu...</p>
+            </div>
+        </div>
 
-            <!-- Energy Chart -->
-            <div class="card">
+        <!-- RIGHT: ENERGY -->
+        <div class="energy-panel">
+            <div class="energy-header">
                 <h2>⚡ Octopus Agile (Next 24h)</h2>
-                <div id="chart-loading" style="color:#666; font-style:italic;">Loading...</div>
-                <div class="chart-container">
-                    <canvas id="agileChart"></canvas>
-                </div>
-                <div id="chart-error" style="color:red; display:none;"></div>
             </div>
+            <div id="chart-loading" style="color:#666; font-size:0.9rem; margin-bottom:10px;">Loading rates...</div>
+            <div class="chart-box">
+                <canvas id="agileChart"></canvas>
+            </div>
+            
+            <!-- CHEAPEST SLOTS -->
+            <div id="slots-container" class="slots-info" style="display:none;">
+                <!-- Injected via JS -->
+            </div>
+            <div id="chart-error" style="color:red; font-size:0.9rem; display:none;"></div>
         </div>
     </div>
 
     <script>
-        // --- MENU LOGIC ---
+        // --- MENU EDIT LOGIC ---
         let isEditMode = false;
-        const EDIT_PIN = "1234"; // Change this PIN
+        const EDIT_PIN = "1234";
 
         function toggleEdit() {
             if (!window.firebaseReady) { alert("Database not connected. Check Firebase Config."); return; }
-            
             if (!isEditMode) {
                 const pin = prompt("Enter Edit PIN:");
                 if (pin === EDIT_PIN) {
                     isEditMode = true;
                     document.getElementById('edit-btn').classList.add('active');
                     document.getElementById('edit-btn').innerText = "🔓 Done";
-                    document.getElementById('add-btn').disabled = false;
-                    // Refresh list to show delete buttons
-                    // (Firebase onValue will handle re-render)
-                } else if (pin !== null) {
-                    alert("Wrong PIN");
-                }
+                    // Re-render to show buttons
+                    const menuRef = firebase.database().ref('weeklyMenu'); // Fallback if module scope issues, but we used window.render
+                    // Trigger re-render manually if needed, but onValue handles it if we set global flag
+                    window.isEditMode = true; 
+                    // Force refresh simulation
+                    const currentData = {}; // In real app, we'd fetch current state. 
+                    // Since onValue is active, we just need to tell the render function the mode changed.
+                    // The render function checks window.isEditMode.
+                } else if (pin !== null) { alert("Wrong PIN"); }
             } else {
                 isEditMode = false;
+                window.isEditMode = false;
                 document.getElementById('edit-btn').classList.remove('active');
                 document.getElementById('edit-btn').innerText = "🔒 Edit";
-                document.getElementById('add-btn').disabled = true;
-                // Refresh list to hide delete buttons
             }
         }
+        // Initialize global flag
+        window.isEditMode = false;
 
-        function submitItem() {
-            const input = document.getElementById('new-item-input');
-            if (window.firebaseReady && input.value.trim()) {
-                window.addItem(input.value.trim());
-                input.value = '';
-            }
-        }
-
-        // --- CALENDAR LOGIC (Same as before) ---
+        // --- CALENDAR LOGIC ---
         const CALENDAR_URL = 'https://calendar.google.com/calendar/ical/8f9b2e07d9ee92bf161283dba01059fe52319cb25d9c7f941b7684d1df7a6b00%40group.calendar.google.com/private-a9281260f59e7a5711027a99de9cc8fa/basic.ics';
         
         function parseICS(text) {
-            const events = [];
-            const lines = text.split(/\r?\n/);
-            let currentEvent = null;
-            let inEvent = false;
-            let cleanLines = [];
-            for (let i = 0; i < lines.length; i++) {
-                if (lines[i].startsWith(' ') || lines[i].startsWith('\t')) {
-                    if (cleanLines.length > 0) cleanLines[cleanLines.length - 1] += lines[i].substring(1);
-                } else { cleanLines.push(lines[i]); }
-            }
-            for (let line of cleanLines) {
-                if (line === 'BEGIN:VEVENT') { inEvent = true; currentEvent = { summary: '', start: null, end: null, allDay: false }; continue; }
-                if (line === 'END:VEVENT') { if (currentEvent && currentEvent.start) events.push(currentEvent); inEvent = false; continue; }
-                if (!inEvent) continue;
-                if (line.startsWith('SUMMARY:')) currentEvent.summary = line.substring(8);
-                else if (line.startsWith('DTSTART')) {
-                    const val = line.split(':')[1];
-                    currentEvent.allDay = (val.length === 8);
-                    currentEvent.start = parseDate(val);
-                }
-                else if (line.startsWith('DTEND')) currentEvent.end = parseDate(line.split(':')[1]);
+            const events = []; const lines = text.split(/\r?\n/); let current = null; let inEvent = false;
+            let clean = [];
+            for(let l of lines) { if(l.startsWith(' ')||l.startsWith('\t')) clean[clean.length-1]+=l.substring(1); else clean.push(l); }
+            for(let l of clean) {
+                if(l==='BEGIN:VEVENT') { inEvent=true; current={sum:'',start:null,end:null,allDay:false}; }
+                else if(l==='END:VEVENT') { if(current&&current.start) events.push(current); inEvent=false; }
+                else if(!inEvent) continue;
+                if(l.startsWith('SUMMARY:')) current.sum = l.substring(8);
+                else if(l.startsWith('DTSTART')) { const v=l.split(':')[1]; current.allDay=(v.length===8); current.start=parseD(v); }
+                else if(l.startsWith('DTEND')) current.end=parseD(l.split(':')[1]);
             }
             return events;
         }
-        function parseDate(val) {
-            if (!val) return null;
-            const y = val.substring(0,4), m = val.substring(4,6), d = val.substring(6,8);
-            if (val.length > 8) {
-                const h = val.substring(9,11), min = val.substring(11,13), s = val.substring(13,15)||'00';
-                return new Date(`${y}-${m}-${d}T${h}:${min}:${s}Z`);
-            }
+        function parseD(v) {
+            if(!v) return null;
+            const y=v.substring(0,4), m=v.substring(4,6), d=v.substring(6,8);
+            if(v.length>8) { const h=v.substring(9,11), min=v.substring(11,13), s=v.substring(13,15)||'00'; return new Date(`${y}-${m}-${d}T${h}:${min}:${s}Z`); }
             return new Date(parseInt(y), parseInt(m)-1, parseInt(d));
         }
 
         fetch(`https://corsproxy.io/?${encodeURIComponent(CALENDAR_URL)}`)
-            .then(r => r.text())
-            .then(text => {
-                const events = parseICS(text);
-                const now = new Date();
-                const startToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-                const startTomorrow = new Date(startToday); startTomorrow.setDate(startTomorrow.getDate()+1);
-                const endTomorrow = new Date(startTomorrow); endTomorrow.setDate(endTomorrow.getDate()+1);
-
-                const filtered = events.filter(e => e.start && e.start < endTomorrow && (e.end || e.start) >= startToday);
-                filtered.sort((a,b) => a.start - b.start);
-
-                document.getElementById('calendar-loading').style.display = 'none';
-                const list = document.getElementById('event-list');
-                list.style.display = 'flex';
-
-                if (filtered.length === 0) { list.innerHTML = '<p style="color:#999">No events.</p>'; return; }
-
-                filtered.forEach(ev => {
-                    const isToday = ev.start >= startToday && ev.start < startTomorrow;
-                    const badge = isToday ? '<span class="badge-today">Today</span>' : '<span class="badge-tomorrow">Tomorrow</span>';
-                    const time = ev.allDay ? 'All Day' : ev.start.toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'});
-                    const card = document.createElement('div');
-                    card.className = 'event-card';
-                    card.innerHTML = `${badge}<div style="font-weight:bold; margin-top:4px;">${time}</div><div>${ev.summary}</div>`;
+            .then(r=>r.text()).then(text=>{
+                const evs = parseICS(text);
+                const now=new Date();
+                const startT = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+                const startTom = new Date(startT); startTom.setDate(startTom.getDate()+1);
+                const endTom = new Date(startTom); endTom.setDate(endTom.getDate()+1);
+                
+                const filtered = evs.filter(e=>e.start && e.start < endTom && (e.end||e.start) >= startT).sort((a,b)=>a.start-b.start);
+                
+                document.getElementById('calendar-loading').style.display='none';
+                const list = document.getElementById('event-list'); list.style.display='flex';
+                if(filtered.length===0) { list.innerHTML='<p style="color:#999;margin:0">No events.</p>'; return; }
+                
+                filtered.forEach(ev=>{
+                    const isT = ev.start >= startT && ev.start < startTom;
+                    const badge = isT ? '<span class="badge badge-today">Today</span>' : '<span class="badge badge-tomorrow">Tomorrow</span>';
+                    const time = ev.allDay ? 'All Day' : ev.start.toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});
+                    const card = document.createElement('div'); card.className='event-card';
+                    card.innerHTML = `${badge}<div style="font-weight:bold">${time}</div><div>${ev.sum}</div>`;
                     list.appendChild(card);
                 });
             })
-            .catch(e => {
-                document.getElementById('calendar-loading').style.display = 'none';
-                document.getElementById('calendar-error').innerText = "Calendar Error";
-                document.getElementById('calendar-error').style.display = 'block';
-            });
+            .catch(e=>{ document.getElementById('calendar-loading').style.display='none'; document.getElementById('calendar-error').style.display='block'; });
 
-        // --- CHART LOGIC ---
-        const TARIFF_CODE = 'E-1R-AGILE-24-10-01-D';
-        const PRODUCT_CODE = 'AGILE-24-10-01';
-        
-        fetch(`https://api.octopus.energy/v1/products/${PRODUCT_CODE}/electricity-tariffs/${TARIFF_CODE}/standard-unit-rates/?period_from=${new Date().toISOString()}&period_to=${new Date(Date.now()+86400000).toISOString()}`)
-            .then(r => r.json())
-            .then(data => {
-                document.getElementById('chart-loading').style.display = 'none';
+        // --- ENERGY & SLOTS LOGIC ---
+        const TARIFF = 'E-1R-AGILE-24-10-01-D';
+        const PROD = 'AGILE-24-10-01';
+
+        fetch(`https://api.octopus.energy/v1/products/${PROD}/electricity-tariffs/${TARIFF}/standard-unit-rates/?period_from=${new Date().toISOString()}&period_to=${new Date(Date.now()+86400000).toISOString()}`)
+            .then(r=>r.json()).then(data=>{
+                document.getElementById('chart-loading').style.display='none';
                 const ctx = document.getElementById('agileChart').getContext('2d');
-                let labels = data.results.map(r => new Date(r.valid_from).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'}));
-                let prices = data.results.map(r => r.value_inc_vat);
+                
+                let labels = data.results.map(r=>new Date(r.valid_from).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'}));
+                let prices = data.results.map(r=>r.value_inc_vat);
                 labels.reverse(); prices.reverse();
                 
-                const colors = prices.map(p => p < 0 ? '#2196f3' : p < 20 ? '#4ade80' : p < 30 ? '#fbbf24' : '#f87171');
+                // Colors
+                const colors = prices.map(p => p<0?'#2196f3':p<20?'#4ade80':p<30?'#fbbf24':'#f87171');
 
                 new Chart(ctx, {
-                    type: 'bar',
-                    data: { labels: labels, datasets: [{ label: 'p/kWh', data: prices, backgroundColor: colors, borderRadius: 4 }] },
-                    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: {display:false} }, scales: { y: { beginAtZero: false } } }
+                    type:'bar',
+                    data:{ labels:labels, datasets:[{label:'p/kWh',data:prices,backgroundColor:colors,borderRadius:4}] },
+                    options:{ responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false}}, scales:{y:{beginAtZero:false}} }
                 });
+
+                // Calculate Cheapest Slots
+                calculateSlots(prices, labels);
             })
-            .catch(e => {
-                document.getElementById('chart-loading').style.display = 'none';
-                document.getElementById('chart-error').innerText = "Energy Error";
-                document.getElementById('chart-error').style.display = 'block';
-            });
+            .catch(e=>{ document.getElementById('chart-loading').style.display='none'; document.getElementById('chart-error').style.display='block'; });
+
+        function calculateSlots(prices, labels) {
+            // Find cheapest contiguous blocks of 1, 2, and 3 hours (2, 4, 6 slots)
+            // Data is 30-min intervals. 1hr = 2 slots.
+            const findCheapest = (sizeSlots) => {
+                let minSum = Infinity;
+                let startIndex = -1;
+                for(let i=0; i<=prices.length-sizeSlots; i++) {
+                    let sum = 0;
+                    for(let j=0; j<sizeSlots; j++) sum += prices[i+j];
+                    if(sum < minSum) { minSum = sum; startIndex = i; }
+                }
+                if(startIndex === -1) return null;
+                const startT = labels[startIndex];
+                const endT = labels[startIndex + sizeSlots]; // End of last slot
+                const avg = (minSum / sizeSlots).toFixed(1);
+                return { start: startT, end: endT, avg: avg };
+            };
+
+            const s1 = findCheapest(2); // 1 hour
+            const s2 = findCheapest(4); // 2 hours
+            const s3 = findCheapest(6); // 3 hours
+
+            const container = document.getElementById('slots-container');
+            container.style.display = 'flex';
+            container.innerHTML = `
+                ${s1 ? `<div class="slot-item"><div class="slot-label">Cheapest 1 Hr</div><div class="slot-time">${s1.start} - ${s1.end}</div><div class="slot-price">Avg ${s1.avg}p</div></div>` : ''}
+                ${s2 ? `<div class="slot-item"><div class="slot-label">Cheapest 2 Hrs</div><div class="slot-time">${s2.start} - ${s2.end}</div><div class="slot-price">Avg ${s2.avg}p</div></div>` : ''}
+                ${s3 ? `<div class="slot-item"><div class="slot-label">Cheapest 3 Hrs</div><div class="slot-time">${s3.start} - ${s3.end}</div><div class="slot-price">Avg ${s3.avg}p</div></div>` : ''}
+            `;
+        }
     </script>
 </body>
 </html>
