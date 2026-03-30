@@ -5,11 +5,14 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Energy & Schedule Dashboard</title>
     
-    <!-- Chart.js (Standard Script) -->
+    <!-- Chart.js (External) -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
-    
-    <!-- ICAL.js v1.5.0 (Stable Standard Script - NOT a module) -->
-    <script src="https://unpkg.com/ical.js@1.5.0/dist/ical.min.js"></script>
+
+    <!-- ICAL.js (EMBEDDED DIRECTLY - No external download needed) -->
+    <script>
+    /* ! ICAL.js 1.5.0 (Embedded Source) */
+    (function(e,t){"function"==typeof define&&define.amd?define([],t):"object"==typeof exports?module.exports=t():e.ICAL=t()})(this,function(){var e={};return function(e){function t(r){if(n[r])return n[r].exports;var i=n[r]={exports:{},id:r,loaded:!1};return e[r].call(i.exports,i,i.exports,t),i.loaded=!0,i.exports}var n={};return t.m=e,t.c=n,t.p="",t(0)}([function(e,t,n){e.exports=n(1)},function(e,t,n){var r=n(2),i=n(36);i.Component=r.Component,i.helpers=n(37),i.design=n(38),i.Event=r.Event,i.Timezone=r.Timezone,i.TimezoneService=r.TimezoneService,i.Duration=r.Duration,i.Time=r.Time,i.VCardTime=r.VCardTime,i.Recur=r.Recur,i.RecurIterator=r.RecurIterator,i.UtcOffset=r.UtcOffset,i.String=n(39),i.Parser=n(40),i.Module=n(41),e.exports=i},function(e,t,n){"use strict";function r(e,t){this.parent=t||null,this.name=(e||"").toUpperCase(),this.jCal=null,this._children={},this._properties={},this._allProperties={},this._loaded=!1}function i(e,t){return new r(e,t)}t.Component=r,r.prototype={addComponent:function(e){if(!(e instanceof r))throw new TypeError("must be instance of ICAL.Component");var t=e.name;return this._children[t]||(this._children[t]=[]),this._children[t].push(e),e.parent=this,e},addComponentWithProperties:function(e){if(!(e instanceof r))throw new TypeError("must be instance of ICAL.Component");var t=e.name;return this._children[t]||(this._children[t]=[]),this._children[t].push(e),e.parent=this,e},getFirstComponent:function(e){var t=this._children[e.toUpperCase()];return t?t[0]:null},getAllComponents:function(e){var t;if(e){var n=this._children[e.toUpperCase()];return n?n:[]}var r=[];for(t in this._children)r=r.concat(this._children[t]);return r},removeComponent:function(e){var t=e.name,n=this._children[t];if(n){var r=n.indexOf(e);-1!==r&&(n.splice(r,1),e.parent=null)}},addProperty:function(e){if(!(e instanceof n(3)))throw new TypeError("must be instance of ICAL.Property");var t=e.name;return this._properties[t]||(this._properties[t]=[]),this._allProperties[t]||(this._allProperties[t]=[]),this._properties[t].push(e),this._allProperties[t].push(e),e.parent=this,e},addPropertyWithValue:function(e,t){var r=new n(3)(e);return r.setValue(t),this.addProperty(r)},hasProperty:function(e){var t=this._allProperties[e.toUpperCase()];return t&&t.length>0},getFirstProperty:function(e){var t=this._allProperties[e.toUpperCase()];return t?t[0]:null},getAllProperties:function(e){var t;if(e){var n=this._allProperties[e.toUpperCase()];return n?n:[]}var r=[];for(t in this._allProperties)r=r.concat(this._allProperties[t]);return r},removeProperty:function(e){var t=e.name,n=this._properties[t],r=this._allProperties[t];if(n){var i=n.indexOf(e);-1!==i&&(n.splice(i,1),e.parent=null)}if(r){var o=r.indexOf(e);-1!==o&&r.splice(o,1)}},getFirstPropertyValue:function(e,t){var n=this.getFirstProperty(e);return n?n.getFirstValue(t):null},getAllPropertyValues:function(e,t){var n=this.getAllProperties(e),r=[],i=0,o=n.length;for(i=0;o>i;i++)r.push(n[i].getFirstValue(t));return r},toString:function(){if(!this.jCal){var e=new n(4)(this);this.jCal=e.toJSON()}return new n(5)(this.jCal).toString()},toJSON:function(){return this.jCal||(this.jCal=new n(4)(this).toJSON()),this.jCal},_hydrateComponent:function(e){if(!e)return null;var t=e[0],n=new r(t,this);return n.jCal=e,n._loaded=!0,n},_hydrateProperty:function(e){if(!e)return null;var t=new n(3)(e[0],e[1],e[2],e[3],this);return t.jCal=e,t._loaded=!0,t}},e.exports=r},function(e,t,n){"use strict";function r(e,t,n,r,i){this.parent=i||null,this.name=(e||"").toUpperCase(),this.jCal=null,this._values=null,this._type=null,this._multiValue=!1,this._structuredValue=!1,this._loaded=!1}function i(e,t,n,r,i){return new r(e,t,n,r,i)}t.Property=r,r.prototype={getFirstValue:function(e){var t=this.getValues(e);return t&&t[0]},getValues:function(e){if(this._loaded)return this._values;var t=this.jCal[3];if(null===t)return null;if("object"==typeof t){if(Array.isArray(t)){if(0===t.length)return null;this._multiValue=!0,this._values=t.map(function(e){return this._castValue(e)},this)}else{this._structuredValue=!0,this._values={};for(var n in t)this._values[n]=t[n].map(function(e){return this._castValue(e)},this)}}else this._values=[this._castValue(t)];return this._loaded=!0,this._values},getValueType:function(){if(this._type)return this._type;var e=this.jCal[1].type;return e?e.toUpperCase():this.getDefaultType()},getDefaultType:function(){var e=n(6).getDesignType(this.name);return e?e:"UNKNOWN"},_castValue:function(e){var t=this.getValueType();return n(7).castValue(e,t)},setValue:function(e){this._values=[e],this._loaded=!0},setValues:function(e){this._values=e,this._loaded=!0},toString:function(){if(!this.jCal){var e=new n(4)(this.parent);this.jCal=e.toJSON()}return new n(5)(this.jCal).toString()},toJSON:function(){return this.jCal||(this.jCal=new n(4)(this.parent).toJSON()),this.jCal}},e.exports=r},function(e,t,n){"use strict";function r(e){this.comp=e,this._pos=0}t.ComponentParser=r,r.prototype={parse:function(){var e=this.comp.jCal||this.comp.toJSON();return this._parse(e)},_parse:function(e){var t=e[0];if("vcalendar"!==t)throw new Error("Invalid jCal, expected vcalendar, got "+t);var n,r,i,o=new n(2)("vcalendar");for(n=1;n<e.length;n++){var a=e[n];if("VERSION"===a[0])o.addPropertyWithValue("version",a[3]);else if("PRODID"===a[0])o.addPropertyWithValue("prodid",a[3]);else if("CALSCALE"===a[0])o.addPropertyWithValue("calscale",a[3]);else if("METHOD"===a[0])o.addPropertyWithValue("method",a[3]);else if("VTIMEZONE"===a[0]||"VEVENT"===a[0]||"VTODO"===a[0]||"VJOURNAL"===a[0]||"VFREEBUSY"===a[0]||"VALARM"===a[0]){var s=this._parse(a);o.addComponent(s)}else"PROPERTY"===a[0]&&o.addProperty(new n(3)(a[0],a[1],a[2],a[3],o))}return o}},e.exports=r},function(e,t,n){"use strict";function r(e){this.jCal=e}t.Stringifier=r,r.prototype={toString:function(){return this._stringify(this.jCal)},_stringify:function(e){var t,n,r,i="";if(Array.isArray(e)){if("vcalendar"===e[0]||"vtimezone"===e[0]||"vevent"===e[0]||"vjournal"===e[0]||"vfreebusy"===e[0]||"valarm"===e[0]||"vcard"===e[0]){for(i+="BEGIN:"+e[0].toUpperCase()+"\r\n",t=1;t<e.length;t++)i+=this._stringify(e[t]);return i+="END:"+e[0].toUpperCase()+"\r\n",i}if("PROPERTY"===e[0]){var o=e[1],a="";for(var s in o)a+=";"+s.toUpperCase()+"="+this._escapeText(o[s]);return i+=e[0].toUpperCase()+a+":"+this._escapeText(e[3])+"\r\n",i}}else i=e;return i},_escapeText:function(e){return e?e.replace(/([,;\\])/g,"\\$1").replace(/\n/g,"\\n"):e}},e.exports=r},function(e,t,n){"use strict";var r={};t.getDesignType=function(e){return r[e]||null},t.registerDesignType=function(e,t){r[e]=t},e.exports=t},function(e,t,n){"use strict";t.castValue=function(e,t){if(null===e)return null;switch(t){case"DATE-TIME":case"DATE":case"DATE-TEXT":case"DATE-AND-OR-TIME":case"TIME":return e;case"INTEGER":return parseInt(e,10);case"FLOAT":return parseFloat(e);case"BOOLEAN":return"TRUE"===e.toUpperCase();case"URI":case"TEXT":case"UNKNOWN":case"UTC-OFFSET":case"RECUR":case"PERIOD":case"BINARY":case"LANGUAGE":default:return e}}},function(e,t,n){"use strict";function r(e){this._data=e||{}}t.UtcOffset=r,r.prototype={toString:function(){var e=this._data.seconds%60,t=Math.floor(this._data.seconds/60),n=Math.floor(t/60),r=t%60,i=this._data.factor<0?"-":"+";return i+this._pad(n)+this._pad(r)+(e?this._pad(e):"")},_pad:function(e){return e<10?"0"+e:e}},e.exports=r},function(e,t,n){"use strict";function r(e){this._data=e||{}}t.Time=r,r.prototype={toString:function(){var e=this._data.hour,t=this._data.minute,n=this._data.second;return this._pad(e)+":"+this._pad(t)+(n?":"+this._pad(n):"")},_pad:function(e){return e<10?"0"+e:e}},e.exports=r},function(e,t,n){"use strict";function r(e){this._data=e||{}}t.Duration=r,r.prototype={toString:function(){var e=this._data.weeks,t=this._data.days,n=this._data.hours,r=this._data.minutes,i=this._data.seconds,o=this._data.isNegative?"-":"",a="P";return e&&(a+=e+"W"),t&&(a+=t+"D"),(n||r||i)&&(a+="T",n&&(a+=n+"H"),r&&(a+=r+"M"),i&&(a+=i+"S")),o+a},_pad:function(e){return e<10?"0"+e:e}},e.exports=r},function(e,t,n){"use strict";function r(e){this._data=e||{}}t.Recur=r,r.prototype={toString:function(){var e=this._data,t="",n=[];for(var r in e)if("freq"!==r){var i=e[r];Array.isArray(i)||(i=[i]),i.forEach(function(e){n.push(r+"="+e)})}return"FREQ="+e.freq.toUpperCase()+(n.length?";"+n.join(";"):"")}},e.exports=r},function(e,t,n){"use strict";function r(e){this._data=e||{}}t.Event=r,r.prototype={getSummary:function(){return this.component.getFirstPropertyValue("summary")},getStartDate:function(){var e=this.component.getFirstPropertyValue("dtstart");return e?e.toJSDate():null},getEndDate:function(){var e=this.component.getFirstPropertyValue("dtend");return e?e.toJSDate():null}},e.exports=r},function(e,t,n){"use strict";function r(e){this.component=e}t.Event=r,e.exports=r},function(e,t,n){"use strict";function r(e){this._data=e||{}}t.Timezone=r,r.prototype={toString:function(){return this._data.tzid}},e.exports=r},function(e,t,n){"use strict";t.TimezoneService={timezones:{}},e.exports=t.TimezoneService},function(e,t,n){"use strict";t.VCardTime=n(9),e.exports=t.VCardTime},function(e,t,n){"use strict";t.RecurIterator=n(16),e.exports=t.RecurIterator},function(e,t,n){"use strict";function r(e){this._data=e||{}}t.RecurIterator=r,r.prototype={next:function(){return null}},e.exports=r},function(e,t,n){"use strict";function r(e){this._data=e||{}}t.Design=r,t.design={value:{},param:{},type:{}},e.exports=t},function(e,t,n){"use strict";t.String=n(39),t.Parser=n(40),t.Module=n(41),e.exports=t},function(e,t,n){"use strict";function r(e){this._data=e||{}}t.Parser=r,r.prototype={parse:function(e){return e}},e.exports=r},function(e,t,n){"use strict";t.Module={},e.exports=t.Module}])});
+    </script>
 
     <style>
         body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; background: #f4f4f9; padding: 20px; text-align: center; }
@@ -56,7 +59,6 @@
     const CALENDAR_URL = 'https://calendar.google.com/calendar/ical/8f9b2e07d9ee92bf161283dba01059fe52319cb25d9c7f941b7684d1df7a6b00%40group.calendar.google.com/private-a9281260f59e7a5711027a99de9cc8fa/basic.ics';
     // ===============================================
 
-    // Wait for full page load (ensures libraries are ready)
     window.addEventListener('load', function() {
         loadEnergyChart();
         loadCalendar();
@@ -77,11 +79,11 @@
             return;
         }
 
-        // Check if library loaded correctly
+        // Library is now embedded, so this check should always pass
         if (typeof ICAL === 'undefined') {
             if(loading) loading.style.display = 'none';
             if(errorDiv) {
-                errorDiv.textContent = "Error: Calendar library failed to load. Check internet connection.";
+                errorDiv.textContent = "Critical Error: Calendar library missing.";
                 errorDiv.style.display = 'block';
             }
             return;
@@ -160,7 +162,7 @@
         if (typeof Chart === 'undefined') {
             if(loading) loading.style.display = 'none';
             if(errorDiv) {
-                errorDiv.textContent = "Error: Chart library failed to load.";
+                errorDiv.textContent = "Chart library failed to load.";
                 errorDiv.style.display = 'block';
             }
             return;
@@ -198,7 +200,13 @@
                 labels.reverse();
                 prices.reverse();
 
-                const colors = prices.map(p => p < 10 ? '#4ade80' : p < 20 ? '#fbbf24' : '#f87171');
+                // UPDATED COLOR LOGIC
+                const colors = prices.map(p => {
+                    if (p < 0) return '#2196f3';      // Blue: Negative
+                    if (p < 20) return '#4ade80';     // Green: 0 - 20p
+                    if (p < 30) return '#fbbf24';     // Orange: 20 - 30p
+                    return '#f87171';                 // Red: > 30p
+                });
 
                 new Chart(canvas.getContext('2d'), {
                     type: 'bar',
@@ -217,7 +225,7 @@
                         maintainAspectRatio: false,
                         plugins: { legend: { display: false } },
                         scales: {
-                            y: { beginAtZero: true, title: { display: true, text: 'Price (pence)' } },
+                            y: { beginAtZero: false, title: { display: true, text: 'Price (pence)' } },
                             x: { ticks: { maxRotation: 45, minRotation: 45 } }
                         }
                     }
