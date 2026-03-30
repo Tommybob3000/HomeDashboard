@@ -49,13 +49,23 @@
             const container = document.getElementById('weekly-menu-container');
             if (!container) return;
             container.innerHTML = '';
+            
             const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+            const todayIndex = new Date().getDay() - 1; // getDay(): 0=Sun, 1=Mon... so -1 makes Mon=0
+            const currentDayName = todayIndex === -1 ? 'Sunday' : days[todayIndex]; // Handle Sunday case
 
-            days.forEach(day => {
+            days.forEach((day, index) => {
                 const key = day.toLowerCase();
                 const items = Array.isArray(currentData[key]) ? currentData[key] : [];
                 const card = document.createElement('div');
                 card.className = 'day-card';
+
+                // ✅ HIGHLIGHT TODAY'S CARD
+                if (day === currentDayName) {
+                    card.style.backgroundColor = '#ecfdf5'; // Pale Green
+                    card.style.border = '2px solid #4ade80'; // Green Border
+                    card.style.position = 'relative';
+                }
 
                 let itemsHtml = '';
                 if (items.length === 0) {
@@ -69,7 +79,10 @@
 
                 const addBtn = isEditMode ? `<button class="add-mini-btn" onclick="addItemPrompt('${key}')">+</button>` : '';
 
-                card.innerHTML = `<div class="day-header"><h3>${day}</h3>${addBtn}</div><div class="day-items">${itemsHtml}</div>`;
+                // Add a small "Today" label if it's the current day
+                const dayLabel = (day === currentDayName) ? `<span style="font-size:0.7rem; color:#4ade80; font-weight:bold; text-transform:uppercase; margin-left:5px;">● Today</span>` : '';
+
+                card.innerHTML = `<div class="day-header"><h3>${day}${dayLabel}</h3>${addBtn}</div><div class="day-items">${itemsHtml}</div>`;
                 container.appendChild(card);
             });
         }
@@ -77,7 +90,7 @@
         function toggleEdit() {
             if (!db) { alert("Database not connected"); return; }
             if (!isEditMode) {
-                const pin = prompt("Enter PIN:");
+                const pin = prompt("Enter PIN");
                 if (pin === "1234") {
                     isEditMode = true;
                     document.getElementById('edit-btn').classList.add('active');
@@ -136,7 +149,9 @@
         .edit-btn { background:none; border:1px solid #ccc; padding:5px 10px; border-radius:6px; cursor:pointer; font-size:0.9rem; transition: all 0.2s; }
         .edit-btn.active { background:var(--red); color:white; border-color:var(--red); }
         .week-scroll { flex:1; overflow-y:auto; display:flex; flex-direction:column; gap:10px; padding-right:5px; }
-        .day-card { background:#f9f9f9; border:1px solid #eee; border-radius:8px; padding:10px; }
+        
+        .day-card { background:#f9f9f9; border:1px solid #eee; border-radius:8px; padding:10px; transition: all 0.3s ease; }
+        
         .day-header { display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid #eee; padding-bottom:5px; margin-bottom:8px; }
         .day-header h3 { margin:0; font-size:1rem; color:#555; }
         .add-mini-btn { background:var(--blue); color:white; border:none; width:24px; height:24px; border-radius:50%; cursor:pointer; font-size:1.2rem; line-height:1; display:flex; align-items:center; justify-content:center; padding:0; }
@@ -200,7 +215,7 @@
             });
         }).catch(()=>{ document.getElementById('calendar-loading').innerText='Error'; });
 
-        // --- ENERGY CHART WITH AUTO-REFRESH ---
+        // Energy Chart
         let agileChart = null;
 
         function loadEnergyData() {
@@ -216,17 +231,16 @@
                 let pr = d.results.map(r=>r.value_inc_vat);
                 lb.reverse(); pr.reverse();
                 
-                // ✅ NEW COLOR LOGIC: Dark Red for >40p
                 const colors = pr.map(p => {
-                    if (p < 0) return '#2196f3';       // Blue
-                    if (p < 20) return '#4ade80';      // Green
-                    if (p < 30) return '#fbbf24';      // Orange
-                    if (p < 40) return '#f87171';      // Red
-                    return '#b91c1c';                  // Dark Red (>40p)
+                    if (p < 0) return '#2196f3';
+                    if (p < 20) return '#4ade80';
+                    if (p < 30) return '#fbbf24';
+                    if (p < 40) return '#f87171';
+                    return '#b91c1c';
                 });
 
                 if (agileChart) {
-                    agileChart.destroy(); // Destroy old chart before creating new one
+                    agileChart.destroy();
                 }
 
                 agileChart = new Chart(ctx,{
@@ -252,12 +266,11 @@
                     }
                 });
                 
-                // Update Slots
                 updateSlots(pr, lb);
             })
             .catch(()=>{ 
                 loading.innerText = 'Error updating'; 
-                setTimeout(loadEnergyData, 60000); // Retry in 1 min if error
+                setTimeout(loadEnergyData, 60000);
             });
         }
 
@@ -270,10 +283,8 @@
                            (s3?`<div class="slot-item"><div class="slot-label">3 Hrs</div><div class="slot-time">${s3.st}-${s3.en}</div><div class="slot-label">${s3.av}p</div></div>`:'');
         }
 
-        // ✅ AUTO-REFRESH: Load now, then every 30 minutes (1800000 ms)
         loadEnergyData();
         setInterval(loadEnergyData, 1800000); 
-
     </script>
 </body>
 </html>
