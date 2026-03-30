@@ -58,14 +58,14 @@
         loadCalendar();
     });
 
-    // --- LIGHTWEIGHT ICS PARSER (No external library needed) ---
+    // --- LIGHTWEIGHT ICS PARSER ---
     function parseICS(text) {
         const events = [];
         const lines = text.split(/\r?\n/);
         let currentEvent = null;
         let inEvent = false;
 
-        // Helper to unwrap lines (handle folded lines)
+        // Handle folded lines (lines starting with space belong to previous line)
         let cleanLines = [];
         for (let i = 0; i < lines.length; i++) {
             if (lines[i].startsWith(' ') || lines[i].startsWith('\t')) {
@@ -78,7 +78,7 @@
         for (let line of cleanLines) {
             if (line === 'BEGIN:VEVENT') {
                 inEvent = true;
-                currentEvent = { summary: '', start: null, end: null };
+                currentEvent = { summary: '', start: null, end: null, allDay: false };
                 continue;
             }
             if (line === 'END:VEVENT') {
@@ -92,33 +92,39 @@
             if (line.startsWith('SUMMARY:')) {
                 currentEvent.summary = line.substring(8).replace(/\\,/g, ',').replace(/\\n/g, ' ');
             } else if (line.startsWith('DTSTART;') || line.startsWith('DTSTART:')) {
-                const val = line.split(':')[1];
+                const parts = line.split(':');
+                const val = parts[1];
+                const isAllDay = (val.length === 8); // YYYYMMDD
                 currentEvent.start = parseICSDate(val);
+                currentEvent.allDay = isAllDay;
             } else if (line.startsWith('DTEND;') || line.startsWith('DTEND:')) {
-                const val = line.split(':')[1];
-                currentEvent.end = parseICSDate(val);
+                const parts = line.split(':');
+                currentEvent.end = parseICSDate(parts[1]);
             }
         }
         return events;
     }
 
     function parseICSDate(val) {
-        // Format: YYYYMMDDTHHMMSSZ or YYYYMMDD
         if (!val) return null;
         const year = val.substring(0, 4);
         const month = val.substring(4, 6);
         const day = val.substring(6, 8);
+        
         if (val.length > 8) {
+            // Date + Time (e.g., 20231025T140000Z)
             const hour = val.substring(9, 11);
             const min = val.substring(11, 13);
             const sec = val.substring(13, 15) || '00';
-            // Handle 'Z' (UTC) by appending it, JS Date parses it correctly
+            // 'Z' indicates UTC. JS Date handles this well.
             return new Date(`${year}-${month}-${day}T${hour}:${min}:${sec}Z`);
         } else {
-            return new Date(`${year}-${month}-${day}T00:00:00`);
+            // All Day Event (e.g., 20231025)
+            // Create date at local midnight
+            return new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
         }
     }
-    // -----------------------------------------------------------
+    // ------------------------------
 
     function loadCalendar() {
         const loading = document.getElementById('calendar-loading');
@@ -145,27 +151,54 @@
             .then(text => {
                 if (!text || text.length < 50) throw new Error("Invalid calendar data");
                 
-                const events = parseICS(text);
+                const allEvents = parseICS(text);
                 
+                // --- STRICT FILTERING LOGIC ---
                 const now = new Date();
-                const tomorrow = new Date(now);
-                tomorrow.setDate(tomorrow.getDate() + 2);
+                
+                // Start of Today (00:00:00)
+                const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+                
+                // End of Tomorrow (23:59:59.999)
+                const endOfTomorrow = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+                endOfTomorrow.setDate(endOfTomorrow.getDate() + 2); // Move to day after tomorrow
+                endOfTomorrow.setMilliseconds(-1); // Go back 1ms to be end of tomorrow
 
-                const filtered = events.filter(ev => ev.start && ev.start < tomorrow);
-                filtered.sort((a, b) => a.start - b.start);
+                const filteredEvents = allEvents.filter(ev => {
+                    if (!ev.start) return false;
+                    
+                    // Event must start BEFORE the end of tomorrow
+                    // AND event must end AFTER the start of today (or be ongoing)
+                    const startsBeforeEndOfTomorrow = ev.start <= endOfTomorrow;
+                    
+                    // If no end date, assume 1 hour duration for filtering
+                    const evEnd = ev.end || new Date(ev.start.getTime() + 3600000);
+                    const endsAfterStartOfToday = evEnd >= startOfToday;
+
+                    return startsBeforeEndOfTomorrow && endsAfterStartOfToday;
+                });
+
+                // Sort by start time
+                filteredEvents.sort((a, b) => a.start - b.start);
                 
                 if(loading) loading.style.display = 'none';
                 if(container) container.style.display = 'block';
 
-                if (filtered.length === 0) {
-                    list.innerHTML = '<p class="no-events">No events today/tomorrow.</p>';
+                if (filteredEvents.length === 0) {
+                    list.innerHTML = '<p class="no-events">No events today or tomorrow.</p>';
                     return;
                 }
 
-                filtered.forEach(ev => {
-                    const isToday = ev.start.toDateString() === now.toDateString();
-                    const timeStr = ev.start.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) + ' - ' + 
-                                    (ev.end ? ev.end.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : 'All day');
+                filteredEvents.forEach(ev => {
+                    const isToday = ev.start >= startOfToday && ev.start < new Date(startOfToday.getTime() + 86400000);
+                    
+                    let timeStr = 'All Day';
+                    if (!ev.allDay) {
+                        const startT = ev.start.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+                        const endT = ev.end ? ev.end.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : 'No end time';
+                        timeStr = `${startT} - ${endT}`;
+                    }
+
                     const card = document.createElement('div');
                     card.className = `event-card ${isToday ? 'event-today' : 'event-tomorrow'}`;
                     card.innerHTML = `<span class="event-time">${timeStr}</span><div class="event-title">${ev.summary || 'No Title'}</div>`;
@@ -229,12 +262,12 @@
                 labels.reverse();
                 prices.reverse();
 
-                // UPDATED COLOR LOGIC
+                // Color Logic: <0 Blue, 0-20 Green, 20-30 Orange, >30 Red
                 const colors = prices.map(p => {
-                    if (p < 0) return '#2196f3';      // Blue: Negative
-                    if (p < 20) return '#4ade80';     // Green: 0 - 20p
-                    if (p < 30) return '#fbbf24';     // Orange: 20 - 30p
-                    return '#f87171';                 // Red: > 30p
+                    if (p < 0) return '#2196f3';      
+                    if (p < 20) return '#4ade80';     
+                    if (p < 30) return '#fbbf24';     
+                    return '#f87171';                 
                 });
 
                 new Chart(canvas.getContext('2d'), {
