@@ -128,27 +128,17 @@
             });
         };
 
-        // --- FULL SCREEN TOGGLE ---
         window.toggleFullScreen = function() {
             if (!document.fullscreenElement) {
-                document.documentElement.requestFullscreen().catch((e) => {
-                    console.log("Fullscreen denied:", e);
-                });
+                document.documentElement.requestFullscreen().catch((e) => console.log(e));
             } else {
-                if (document.exitFullscreen) {
-                    document.exitFullscreen();
-                }
+                if (document.exitFullscreen) document.exitFullscreen();
             }
         };
 
-        // Listen for fullscreen changes to hide/show button
         document.addEventListener('fullscreenchange', () => {
             const btn = document.getElementById('fullscreen-btn');
-            if (document.fullscreenElement) {
-                btn.style.display = 'none'; // Hide button in fullscreen
-            } else {
-                btn.style.display = 'flex'; // Show button in windowed mode
-            }
+            btn.style.display = document.fullscreenElement ? 'none' : 'flex';
         });
 
         window.addEventListener('DOMContentLoaded', () => {
@@ -186,12 +176,7 @@
             overflow: hidden;
         }
 
-        /* Header Area (Calendar + Fullscreen Btn) */
-        .header-area {
-            position: relative;
-            width: 100%;
-        }
-
+        .header-area { position: relative; width: 100%; }
         .top-section {
             background: var(--card-bg);
             padding: 15px 20px;
@@ -213,12 +198,7 @@
             letter-spacing: 0.05em;
         }
         .event-scroll {
-            display: flex;
-            gap: 10px;
-            overflow-x: auto;
-            justify-content: center;
-            padding-bottom: 5px;
-            scrollbar-width: none;
+            display: flex; gap: 10px; overflow-x: auto; justify-content: center; padding-bottom: 5px; scrollbar-width: none;
         }
         .event-scroll::-webkit-scrollbar { display: none; }
         
@@ -234,117 +214,47 @@
             flex-shrink: 0;
         }
         .badge {
-            font-size: 0.6rem;
-            font-weight: 700;
-            color: white;
-            padding: 2px 6px;
-            border-radius: 12px;
-            text-transform: uppercase;
-            display: inline-block;
-            margin-bottom: 4px;
+            font-size: 0.6rem; font-weight: 700; color: white; padding: 2px 6px; border-radius: 12px; text-transform: uppercase; display: inline-block; margin-bottom: 4px;
         }
         .badge-today { background: var(--success); }
         .badge-tomorrow { background: var(--warning); }
         .event-time { font-weight: 600; color: var(--text-main); font-size: 0.9rem; }
         .event-summary { color: var(--text-muted); font-size: 0.8rem; margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 120px; }
 
-        /* Fullscreen Button */
         #fullscreen-btn {
-            position: absolute;
-            top: 10px;
-            right: 10px;
-            background: white;
-            border: 1px solid #e5e7eb;
-            color: var(--text-muted);
-            width: 36px;
-            height: 36px;
-            border-radius: 50%;
-            cursor: pointer;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            box-shadow: var(--shadow-sm);
-            transition: all 0.2s;
-            z-index: 100;
-            font-size: 1.2rem;
+            position: absolute; top: 10px; right: 10px;
+            background: white; border: 1px solid #e5e7eb; color: var(--text-muted);
+            width: 36px; height: 36px; border-radius: 50%;
+            cursor: pointer; display: flex; align-items: center; justify-content: center;
+            box-shadow: var(--shadow-sm); transition: all 0.2s; z-index: 100; font-size: 1.2rem;
         }
-        #fullscreen-btn:hover {
-            background: var(--primary);
-            color: white;
-            border-color: var(--primary);
-            transform: scale(1.05);
-        }
+        #fullscreen-btn:hover { background: var(--primary); color: white; border-color: var(--primary); transform: scale(1.05); }
 
-        /* Main Split */
-        .main-split {
-            display: flex;
-            gap: 15px;
-            flex: 1;
-            overflow: hidden;
-            min-height: 0;
-        }
+        .main-split { display: flex; gap: 15px; flex: 1; overflow: hidden; min-height: 0; }
 
-        /* Menu Panel */
         .menu-panel {
-            flex: 1;
-            max-width: 350px;
-            background: var(--card-bg);
-            padding: 15px;
-            border-radius: var(--radius);
-            box-shadow: var(--shadow-md);
-            display: flex;
-            flex-direction: column;
-            min-width: 0;
+            flex: 1; max-width: 350px; background: var(--card-bg); padding: 15px; border-radius: var(--radius); box-shadow: var(--shadow-md);
+            display: flex; flex-direction: column; min-width: 0;
         }
         .menu-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 10px;
-            padding-bottom: 10px;
-            border-bottom: 1px solid #f3f4f6;
-            flex-shrink: 0;
+            display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; padding-bottom: 10px; border-bottom: 1px solid #f3f4f6; flex-shrink: 0;
         }
         .menu-header h2 { margin: 0; font-size: 1.1rem; font-weight: 700; }
         
         .edit-btn {
-            background: white;
-            border: 1px solid #e5e7eb;
-            color: var(--text-muted);
-            padding: 5px 12px;
-            border-radius: 20px;
-            cursor: pointer;
-            font-size: 0.8rem;
-            font-weight: 500;
-            transition: all 0.2s;
+            background: white; border: 1px solid #e5e7eb; color: var(--text-muted);
+            padding: 5px 12px; border-radius: 20px; cursor: pointer; font-size: 0.8rem; font-weight: 500; transition: all 0.2s;
         }
         .edit-btn.active { background: var(--danger); color: white; border-color: var(--danger); }
 
-        .week-scroll {
-            flex: 1;
-            overflow-y: auto;
-            display: flex;
-            flex-direction: column;
-            gap: 10px;
-            padding-right: 5px;
-            min-height: 0;
-        }
+        .week-scroll { flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; padding-right: 5px; min-height: 0; }
         .week-scroll::-webkit-scrollbar { width: 6px; }
         .week-scroll::-webkit-scrollbar-thumb { background: #e5e7eb; border-radius: 3px; }
 
         .day-card {
-            background: #f9fafb;
-            border: 1px solid #f3f4f6;
-            border-radius: 10px;
-            padding: 12px;
-            transition: all 0.3s ease;
-            flex-shrink: 0;
+            background: #f9fafb; border: 1px solid #f3f4f6; border-radius: 10px; padding: 12px; transition: all 0.3s ease; flex-shrink: 0;
         }
-        .day-card-today {
-            background: #ecfdf5;
-            border: 1px solid #a7f3d0;
-            box-shadow: 0 2px 4px rgba(16, 185, 129, 0.1);
-        }
+        .day-card-today { background: #ecfdf5; border: 1px solid #a7f3d0; box-shadow: 0 2px 4px rgba(16, 185, 129, 0.1); }
 
         .day-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
         .day-title-group { display: flex; align-items: center; gap: 6px; }
@@ -372,52 +282,23 @@
             background: #fee2e2; color: var(--danger); border: none;
             width: 18px; height: 18px; border-radius: 50%;
             cursor: pointer; font-size: 0.7rem;
-            display: flex; align-items: center; justify-content: center;
-            flex-shrink: 0;
+            display: flex; align-items: center; justify-content: center; flex-shrink: 0;
         }
 
-        /* Energy Panel */
         .energy-panel {
-            flex: 2;
-            background: var(--card-bg);
-            padding: 15px;
-            border-radius: var(--radius);
-            box-shadow: var(--shadow-md);
-            display: flex;
-            flex-direction: column;
-            min-width: 0;
-            overflow: hidden;
+            flex: 2; background: var(--card-bg); padding: 15px; border-radius: var(--radius); box-shadow: var(--shadow-md);
+            display: flex; flex-direction: column; min-width: 0; overflow: hidden;
         }
-        .energy-header {
-            display: flex; justify-content: space-between; align-items: center;
-            margin-bottom: 10px;
-            flex-shrink: 0;
-        }
+        .energy-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; flex-shrink: 0; }
         .energy-header h2 { margin: 0; font-size: 1.1rem; font-weight: 700; }
         
-        #chart-loading {
-            font-size: 0.8rem; color: var(--text-muted);
-            margin-bottom: 5px; flex-shrink: 0;
-        }
+        #chart-loading { font-size: 0.8rem; color: var(--text-muted); margin-bottom: 5px; flex-shrink: 0; }
 
-        .chart-box {
-            flex: 1; 
-            position: relative; 
-            min-height: 0;
-            width: 100%;
-        }
+        .chart-box { flex: 1; position: relative; min-height: 0; width: 100%; }
         
         .slots-info {
-            margin-top: 15px;
-            padding: 10px;
-            background: #eff6ff;
-            border-radius: 10px;
-            border: 1px solid #dbeafe;
-            display: flex;
-            justify-content: space-around;
-            flex-wrap: wrap;
-            gap: 10px;
-            flex-shrink: 0;
+            margin-top: 15px; padding: 10px; background: #eff6ff; border-radius: 10px; border: 1px solid #dbeafe;
+            display: flex; justify-content: space-around; flex-wrap: wrap; gap: 10px; flex-shrink: 0;
         }
         .slot-item { text-align: center; min-width: 80px; }
         .slot-label { font-size: 0.65rem; color: #6b7280; font-weight: 700; text-transform: uppercase; margin-bottom: 2px; }
@@ -433,12 +314,8 @@
 </head>
 <body>
 
-    <!-- HEADER AREA -->
     <div class="header-area">
-        <!-- Full Screen Button -->
         <button id="fullscreen-btn" onclick="toggleFullScreen()" title="Toggle Full Screen">⛶</button>
-        
-        <!-- Calendar -->
         <div class="top-section">
             <h2>📅 Today & Tomorrow</h2>
             <div id="calendar-loading" style="color:#9ca3af; font-size:0.85rem;">Loading...</div>
@@ -447,7 +324,6 @@
     </div>
 
     <div class="main-split">
-        <!-- LEFT: MENU -->
         <div class="menu-panel">
             <div class="menu-header">
                 <h2>🍽️ Weekly Menu</h2>
@@ -458,7 +334,6 @@
             </div>
         </div>
 
-        <!-- RIGHT: ENERGY -->
         <div class="energy-panel">
             <div class="energy-header">
                 <h2>⚡ Agile Rates</h2>
@@ -546,11 +421,20 @@
                             y: { 
                                 beginAtZero: true,
                                 grid: { color: '#f3f4f6', drawBorder: false },
-                                ticks: { color: '#9ca3af', font: { family: 'Inter', size: 10 } }
+                                ticks: { 
+                                    color: '#374151', // Darker color
+                                    font: { family: 'Inter', size: 13, weight: '600' } // Larger, bold font
+                                }
                             },
                             x: { 
-                                grid: { display: false },
-                                ticks: { color: '#9ca3af', font: { family: 'Inter', size: 9 }, maxRotation: 45, minRotation: 45 }
+                                grid: { display: false }, // Remove vertical grid lines for clarity
+                                ticks: { 
+                                    color: '#374151', // Darker color
+                                    font: { family: 'Inter', size: 12, weight: '600' }, // Larger, bold font
+                                    maxRotation: 45, 
+                                    minRotation: 45,
+                                    autoSkipPadding: 10 // Add extra space between labels
+                                }
                             }
                         }
                     }
