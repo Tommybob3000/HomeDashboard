@@ -67,8 +67,8 @@
                     itemsHtml = `<div class="empty-state">No plans yet</div>`;
                 } else {
                     items.forEach((item, idx) => {
-                        const delBtn = isEditMode ? `<button class="delete-btn" onclick="deleteItem('$${key}', $${idx})">×</button>` : '';
-                        itemsHtml += `<div class="menu-item">$${delBtn}<span class="item-text">$${item}</span></div>`;
+                        const delBtn = isEditMode ? `<button class="delete-btn" onclick="deleteItem('${key}', ${idx})">×</button>` : '';
+                        itemsHtml += `<div class="menu-item">${delBtn}<span class="item-text">${item}</span></div>`;
                     });
                 }
 
@@ -165,4 +165,359 @@
 
         /* --- Top Calendar --- */
         .top-section {
-            background: var(--card-bg
+            background: var(--card-bg);
+            padding: 15px 20px;
+            border-radius: var(--radius);
+            box-shadow: var(--shadow-md);
+            flex: 0 0 auto; /* Don't grow/shrink */
+            max-height: 20vh; /* Max 20% of screen height */
+            overflow: hidden;
+            text-align: center;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+        }
+        .top-section h2 {
+            margin: 0 0 10px 0;
+            font-size: 1rem;
+            font-weight: 600;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+        .event-scroll {
+            display: flex;
+            gap: 10px;
+            overflow-x: auto;
+            justify-content: center;
+            padding-bottom: 5px;
+            scrollbar-width: none;
+        }
+        .event-scroll::-webkit-scrollbar { display: none; }
+        
+        .event-card {
+            background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%);
+            border-left: 4px solid var(--primary);
+            padding: 8px 12px;
+            border-radius: 10px;
+            min-width: 120px;
+            font-size: 0.85rem;
+            text-align: left;
+            box-shadow: var(--shadow-sm);
+            flex-shrink: 0;
+        }
+        .badge {
+            font-size: 0.6rem;
+            font-weight: 700;
+            color: white;
+            padding: 2px 6px;
+            border-radius: 12px;
+            text-transform: uppercase;
+            display: inline-block;
+            margin-bottom: 4px;
+        }
+        .badge-today { background: var(--success); }
+        .badge-tomorrow { background: var(--warning); }
+        .event-time { font-weight: 600; color: var(--text-main); font-size: 0.9rem; }
+        .event-summary { color: var(--text-muted); font-size: 0.8rem; margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 120px; }
+
+        /* --- Main Split --- */
+        .main-split {
+            display: flex;
+            gap: 15px;
+            flex: 1; /* Take remaining height */
+            overflow: hidden;
+            min-height: 0; /* Critical for flex children scrolling */
+        }
+
+        /* --- Left: Menu --- */
+        .menu-panel {
+            flex: 1;
+            max-width: 350px;
+            background: var(--card-bg);
+            padding: 15px;
+            border-radius: var(--radius);
+            box-shadow: var(--shadow-md);
+            display: flex;
+            flex-direction: column;
+            min-width: 0; /* Prevent overflow */
+        }
+        .menu-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+            padding-bottom: 10px;
+            border-bottom: 1px solid #f3f4f6;
+            flex-shrink: 0;
+        }
+        .menu-header h2 { margin: 0; font-size: 1.1rem; font-weight: 700; }
+        
+        .edit-btn {
+            background: white;
+            border: 1px solid #e5e7eb;
+            color: var(--text-muted);
+            padding: 5px 12px;
+            border-radius: 20px;
+            cursor: pointer;
+            font-size: 0.8rem;
+            font-weight: 500;
+            transition: all 0.2s;
+        }
+        .edit-btn.active { background: var(--danger); color: white; border-color: var(--danger); }
+
+        .week-scroll {
+            flex: 1;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            padding-right: 5px;
+            min-height: 0;
+        }
+        .week-scroll::-webkit-scrollbar { width: 6px; }
+        .week-scroll::-webkit-scrollbar-thumb { background: #e5e7eb; border-radius: 3px; }
+
+        .day-card {
+            background: #f9fafb;
+            border: 1px solid #f3f4f6;
+            border-radius: 10px;
+            padding: 12px;
+            transition: all 0.3s ease;
+            flex-shrink: 0;
+        }
+        .day-card-today {
+            background: #ecfdf5;
+            border: 1px solid #a7f3d0;
+            box-shadow: 0 2px 4px rgba(16, 185, 129, 0.1);
+        }
+
+        .day-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+        .day-title-group { display: flex; align-items: center; gap: 6px; }
+        .day-title-group h3 { margin: 0; font-size: 0.9rem; font-weight: 600; }
+        .today-badge { font-size: 0.6rem; color: var(--success); font-weight: 700; text-transform: uppercase; }
+
+        .add-btn {
+            background: var(--primary); color: white; border: none;
+            width: 22px; height: 22px; border-radius: 50%;
+            cursor: pointer; font-size: 1rem; line-height: 1;
+            display: flex; align-items: center; justify-content: center;
+        }
+
+        .day-items { display: flex; flex-direction: column; gap: 4px; }
+        .empty-state { color: #9ca3af; font-size: 0.8rem; font-style: italic; text-align: center; }
+        
+        .menu-item {
+            display: flex; align-items: center; gap: 6px;
+            font-size: 0.85rem; color: var(--text-main);
+            background: white; padding: 5px 8px;
+            border-radius: 6px; border: 1px solid #f3f4f6;
+        }
+        .item-text { flex: 1; word-break: break-word; }
+        .delete-btn {
+            background: #fee2e2; color: var(--danger); border: none;
+            width: 18px; height: 18px; border-radius: 50%;
+            cursor: pointer; font-size: 0.7rem;
+            display: flex; align-items: center; justify-content: center;
+            flex-shrink: 0;
+        }
+
+        /* --- Right: Energy (SCALABLE) --- */
+        .energy-panel {
+            flex: 2;
+            background: var(--card-bg);
+            padding: 15px;
+            border-radius: var(--radius);
+            box-shadow: var(--shadow-md);
+            display: flex;
+            flex-direction: column;
+            min-width: 0;
+            overflow: hidden; /* Contains the chart */
+        }
+        .energy-header {
+            display: flex; justify-content: space-between; align-items: center;
+            margin-bottom: 10px;
+            flex-shrink: 0;
+        }
+        .energy-header h2 { margin: 0; font-size: 1.1rem; font-weight: 700; }
+        
+        #chart-loading {
+            font-size: 0.8rem; color: var(--text-muted);
+            margin-bottom: 5px; flex-shrink: 0;
+        }
+
+        /* Chart Container: Takes all available space */
+        .chart-box {
+            flex: 1; 
+            position: relative; 
+            min-height: 0; /* Allows shrinking */
+            width: 100%;
+        }
+        
+        /* Slots Info: Never shrinks, sits at bottom */
+        .slots-info {
+            margin-top: 15px;
+            padding: 10px;
+            background: #eff6ff;
+            border-radius: 10px;
+            border: 1px solid #dbeafe;
+            display: flex;
+            justify-content: space-around;
+            flex-wrap: wrap;
+            gap: 10px;
+            flex-shrink: 0; /* Prevents being cut off */
+        }
+        .slot-item { text-align: center; min-width: 80px; }
+        .slot-label { font-size: 0.65rem; color: #6b7280; font-weight: 700; text-transform: uppercase; margin-bottom: 2px; }
+        .slot-time { font-weight: 700; color: var(--primary); font-size: 0.9rem; line-height: 1.2; }
+        .slot-price { font-size: 0.75rem; color: #9ca3af; font-weight: 500; }
+
+        /* Tablet/Mobile Adjustments */
+        @media(max-width: 900px) {
+            .main-split { flex-direction: column; }
+            .menu-panel { max-width: 100%; height: 30%; min-height: 200px; }
+            .energy-panel { height: 70%; }
+        }
+    </style>
+</head>
+<body>
+
+    <!-- TOP: CALENDAR -->
+    <div class="top-section">
+        <h2>📅 Today & Tomorrow</h2>
+        <div id="calendar-loading" style="color:#9ca3af; font-size:0.85rem;">Loading...</div>
+        <div id="event-list" class="event-scroll" style="display:none;"></div>
+    </div>
+
+    <div class="main-split">
+        <!-- LEFT: MENU -->
+        <div class="menu-panel">
+            <div class="menu-header">
+                <h2>🍽️ Weekly Menu</h2>
+                <button id="edit-btn" class="edit-btn">✏️ Edit</button>
+            </div>
+            <div id="weekly-menu-container" class="week-scroll">
+                <div style="text-align:center; color:#9ca3af; margin-top:20px;">Loading...</div>
+            </div>
+        </div>
+
+        <!-- RIGHT: ENERGY -->
+        <div class="energy-panel">
+            <div class="energy-header">
+                <h2>⚡ Agile Rates</h2>
+            </div>
+            <div id="chart-loading">Updating...</div>
+            <div class="chart-box">
+                <canvas id="agileChart"></canvas>
+            </div>
+            <div id="slots-container" class="slots-info" style="display:none;"></div>
+        </div>
+    </div>
+
+    <script>
+        // --- CALENDAR ---
+        const CAL_URL = 'https://calendar.google.com/calendar/ical/8f9b2e07d9ee92bf161283dba01059fe52319cb25d9c7f941b7684d1df7a6b00%40group.calendar.google.com/private-a9281260f59e7a5711027a99de9cc8fa/basic.ics';
+        fetch(`https://corsproxy.io/?${encodeURIComponent(CAL_URL)}`)
+        .then(r=>r.text()).then(text=>{
+            const events = []; const lines = text.split(/\r?\n/); let cur=null, inEv=false;
+            for(let l of lines) {
+                if(l==='BEGIN:VEVENT') { inEv=true; cur={s:'',st:null}; }
+                else if(l==='END:VEVENT') { if(cur&&cur.st) events.push(cur); inEv=false; }
+                else if(!inEv) continue;
+                if(l.startsWith('SUMMARY:')) cur.s=l.substring(8);
+                else if(l.startsWith('DTSTART')) { const v=l.split(':')[1]; cur.st = new Date(v.length>8 ? `${v.substring(0,4)}-${v.substring(4,6)}-${v.substring(6,8)}T${v.substring(9,11)}:${v.substring(11,13)}:00Z` : `${v.substring(0,4)}-${v.substring(4,6)}-${v.substring(6,8)}`); }
+            }
+            const now=new Date(); const startT=new Date(now.getFullYear(),now.getMonth(),now.getDate());
+            const endT=new Date(startT); endT.setDate(endT.getDate()+2);
+            const f=events.filter(e=>e.st && e.st<endT && e.st>=startT).sort((a,b)=>a.st-b.st);
+            
+            document.getElementById('calendar-loading').style.display='none';
+            const list=document.getElementById('event-list'); list.style.display='flex';
+            
+            if(f.length===0) { list.innerHTML='<span style="color:#9ca3af; font-style:italic;">No events</span>'; }
+            else {
+                f.forEach(e=>{
+                    const isToday = e.st.toDateString()===now.toDateString();
+                    const timeStr = e.st.getHours()===0 && e.st.getMinutes()===0 ? 'All Day' : e.st.toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});
+                    list.innerHTML+=`<div class="event-card"><span class="badge ${isToday?'badge-today':'badge-tomorrow'}">${isToday?'Today':'Tomorrow'}</span><div class="event-time">${timeStr}</div><div class="event-summary">${e.s}</div></div>`;
+                });
+            }
+        }).catch(()=>{ document.getElementById('calendar-loading').innerText='Error'; });
+
+        // --- ENERGY CHART ---
+        let agileChart = null;
+
+        function loadEnergyData() {
+            const loading = document.getElementById('chart-loading');
+            loading.style.display = 'block';
+            
+            fetch(`https://api.octopus.energy/v1/products/AGILE-24-10-01/electricity-tariffs/E-1R-AGILE-24-10-01-D/standard-unit-rates/?period_from=${new Date().toISOString()}&period_to=${new Date(Date.now()+86400000).toISOString()}`)
+            .then(r=>r.json()).then(d=>{
+                loading.style.display = 'none';
+                const ctx = document.getElementById('agileChart').getContext('2d');
+                let lb = d.results.map(r=>new Date(r.valid_from).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'}));
+                let pr = d.results.map(r=>r.value_inc_vat);
+                lb.reverse(); pr.reverse();
+                
+                const colors = pr.map(p => {
+                    if (p < 0) return '#3b82f6';
+                    if (p < 20) return '#10b981';
+                    if (p < 30) return '#f59e0b';
+                    if (p < 40) return '#ef4444';
+                    return '#b91c1c';
+                });
+
+                if (agileChart) agileChart.destroy();
+
+                agileChart = new Chart(ctx,{
+                    type:'bar',
+                    data:{
+                        labels:lb,
+                        datasets:[{
+                            data:pr,
+                            backgroundColor: colors,
+                            borderRadius: 6,
+                            barPercentage: 0.9,
+                            categoryPercentage: 1.0
+                        }]
+                    },
+                    options:{
+                        responsive:true,
+                        maintainAspectRatio:false,
+                        plugins:{legend:{display:false}},
+                        scales:{
+                            y: { 
+                                beginAtZero: true,
+                                grid: { color: '#f3f4f6', drawBorder: false },
+                                ticks: { color: '#9ca3af', font: { family: 'Inter', size: 10 } }
+                            },
+                            x: { 
+                                grid: { display: false },
+                                ticks: { color: '#9ca3af', font: { family: 'Inter', size: 9 }, maxRotation: 45, minRotation: 45 }
+                            }
+                        }
+                    }
+                });
+                
+                updateSlots(pr, lb);
+            })
+            .catch(()=>{ loading.innerText = 'Update failed'; setTimeout(loadEnergyData, 60000); });
+        }
+
+        function updateSlots(pr, lb) {
+            const find=(n)=>{ let min=Infinity, idx=-1; for(let i=0;i<=pr.length-n;i++){let s=0;for(let j=0;j<n;j++)s+=pr[i+j]; if(s<min){min=s;idx=i;}} return idx>-1?{st:lb[idx],en:lb[idx+n],av:(min/n).toFixed(1)}:null; };
+            const s1=find(2), s2=find(4), s3=find(6);
+            const sc=document.getElementById('slots-container'); 
+            sc.style.display='flex';
+            
+            // Compact layout for small screens
+            sc.innerHTML = (s1?`<div class="slot-item"><div class="slot-label">1 Hr</div><div class="slot-time">${s1.st}-${s1.en}</div><div class="slot-price">${s1.av}p</div></div>`:'') + 
+                           (s2?`<div class="slot-item"><div class="slot-label">2 Hrs</div><div class="slot-time">${s2.st}-${s2.en}</div><div class="slot-price">${s2.av}p</div></div>`:'') + 
+                           (s3?`<div class="slot-item"><div class="slot-label">3 Hrs</div><div class="slot-time">${s3.st}-${s3.en}</div><div class="slot-price">${s3.av}p</div></div>`:'');
+        }
+
+        loadEnergyData();
+        setInterval(loadEnergyData, 1800000); 
+    </script>
+</body>
+</html>
